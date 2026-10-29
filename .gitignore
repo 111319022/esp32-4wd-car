@@ -1,0 +1,16 @@
+# 編譯產物
+build/
+*.bin
+*.elf
+*.map
+
+# 編輯器與系統檔
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 個人設定（不要上傳）
+*.local.md
+CLAUDE.local.md
+.claude/settings.local.json
