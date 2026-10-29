@@ -84,3 +84,5 @@ constexpr unsigned long AUTO_TURN_TIMEOUT_MS = 1500;  // 轉太久還沒脫困�
 constexpr float BATTERY_DIVIDER_RATIO = 3.0f;  // (20k + 10k) / 10k
 constexpr float BATTERY_LOW_V = 7.0f;          // 3.5 V／顆：手把震動提醒
 constexpr float BATTERY_CRITICAL_V = 6.6f;     // 3.3 V／顆：停車保護電池（LG MJ1 沒有保護板）
+constexpr unsigned long BATTERY_CRITICAL_HOLD_MS = 3000;  // 連續低於 CRITICAL 這麼久就鎖定停車，重開機才解除
+constexpr float BATTERY_ABSENT_V = 5.0f;       // 低於此值視為沒接電池（只插 USB），不鎖定

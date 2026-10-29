@@ -8,4 +8,4 @@ void batteryUpdate();
 
 float batteryVolts();
 bool batteryLow();       // 低於 BATTERY_LOW_V：該充電了
-bool batteryCritical();  // 低於 BATTERY_CRITICAL_V：必須停車
+bool batteryCritical();  // 低於 BATTERY_CRITICAL_V：必須停車；持續過低會鎖定，重開機才解除
