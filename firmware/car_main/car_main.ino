@@ -1,7 +1,7 @@
 // 蠻橫衝直撞無理四驅車 — 主程式
 // 機電整合實務應用 2026 Fall
 //
-// 開發環境：Arduino IDE + esp32_bluepad32 開發板套件，開發板選「ESP32 Dev Board」
+// 開發環境：Arduino IDE + esp32_bluepad32 開發板套件，開發板選 esp32_bluepad32 底下的「ESP32 Dev Module」
 // 安裝方式見 docs/setup.md；腳位與參數都在 config.h
 //
 // 每圈 loop 依序做：讀手把 → 量一顆超音波 → 讀電池 → 依模式算左右輪速度 → 輸出到 L298N
@@ -30,7 +30,7 @@ void setup() {
   extrasBegin();
   gamepadBegin();
 
-  Serial.println("等待 Switch 手把連線（按住手把上的配對鍵）...");
+  Serial.println("等待手把連線：左右兩支 Joy-Con 各按住側邊同步鍵（或一支 Pro 手把）...");
 }
 
 // 手動模式：搖桿 → 左右輪速度（%），含防撞輔助

@@ -10,7 +10,7 @@
 | `config.h` | 腳位、功能開關、所有可調參數 | — |
 | `motors.*` | L298N 坦克式驅動 | `motorsBegin`、`motorsSet`、`motorsSetPercent`、`motorsStop` |
 | `sonar.*` | 三顆 HC-SR04 輪流測距 | `sonarBegin`、`sonarUpdate`、`sonarCm` |
-| `gamepad.*` | Bluepad32 手把（只接第一支） | `gamepadBegin`、`gamepadUpdate`、`gamepadState`、`gamepadRumble` |
+| `gamepad.*` | Bluepad32 手把（左右兩支 Joy-Con，或一支 Pro 手把當備用） | `gamepadBegin`、`gamepadUpdate`、`gamepadState`、`gamepadRumble` |
 | `autopilot.*` | 自動避障狀態機 | `autopilotReset`、`autopilotStep`、`autopilotStateName` |
 | `battery.*` | 電池電壓監測 | `batteryBegin`、`batteryUpdate`、`batteryVolts`、`batteryLow`、`batteryCritical` |
 | `extras.*` | 選配車燈、喇叭 | `extrasBegin`、`extrasUpdate`、`extrasOff` |
@@ -30,6 +30,29 @@
 **不可長時間阻塞**：超音波的 `pulseIn` 最多阻塞約 20 ms，這已經是上限。需要計時的動作（例如後退 0.5 秒）一律用 `millis()` 寫成狀態機。
 
 ## 手把對應
+
+主要用**左右兩支 Joy-Con 直握**（一手一支）。兩支都連上才算「手把已連線」；**任何一支斷線就停車**並回到手動。也可以改用一支 Pro 手把（備用）；已經連上 Joy-Con 時 Pro 手把會被拒絕，反之亦然。
+
+### 雙 Joy-Con（主要）
+
+Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都轉了 90 度，所以程式讀的軸和直覺不同：
+
+| 按鍵 | 功能 | 程式 |
+|---|---|---|
+| 左 Joy-Con 搖桿上下 | 油門 T | `-joyLeft->axisX()`（往上推是負值） |
+| 右 Joy-Con 搖桿左右 | 轉向 S | `joyRight->axisY()`（往右推是正值） |
+| 右 ZR（按住） | 速度上限 60% → 100% | `joyRight->r2()` |
+| ＋（右 Joy-Con） | 切換手動／自動 | `joyRight->miscButtons() & MISC_BUTTON_START` |
+| 右 Joy-Con 的 A | 喇叭（選配） | `joyRight->a()` |
+| 右 Joy-Con 的 B | 車燈開關（選配） | `joyRight->x()` |
+
+方向相反時改 `config.h` 的 `JOYCON_THROTTLE_INVERTED`／`JOYCON_STEER_INVERTED`。
+
+⚠️ 上表是依 esp32_bluepad32 4.1.0 的原始碼推得，**還沒實測**，請用 `test_gamepad` 確認後更新。
+
+⚠️ **4.1.0 沒有啟用 Joy-Con 的震動**（Bluepad32 5.0 才修正），Joy-Con 很可能不會震，防撞輔助與低電量就沒有震動提醒。實測確認後可考慮打開蜂鳴器（`FEATURE_BUZZER`）代替。
+
+### Pro 手把（備用）
 
 | 按鍵 | 功能 | 程式 |
 |---|---|---|
@@ -92,7 +115,7 @@ TURN 回到 CRUISE 的條件是正前 > `AUTO_FRONT_CM + AUTO_CLEAR_MARGIN_CM`�
 
 | 情況 | 行為 |
 |---|---|
-| 手把斷線 | 立刻停車、關閉車燈喇叭、回到手動模式 |
+| 手把斷線（雙 Joy-Con 時任何一支） | 立刻停車、關閉車燈喇叭、回到手動模式 |
 | 電池 < `BATTERY_LOW_V`（7.0 V） | 手把震動提醒 |
 | 電池 < `BATTERY_CRITICAL_V`（6.6 V） | 強制停車並震動 |
 | 電池連續 < 6.6 V 達 `BATTERY_CRITICAL_HOLD_MS`（3 秒） | **鎖定停車**，重開機才解除 |

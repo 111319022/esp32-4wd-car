@@ -56,6 +56,9 @@ constexpr float RIGHT_TRIM = 1.0f;
 constexpr int SPEED_LIMIT_NORMAL_PCT = 60;  // 平常的速度上限
 constexpr int SPEED_LIMIT_BOOST_PCT = 100;  // 按住 ZR 時的速度上限
 constexpr int STICK_DEADZONE = 40;          // 搖桿死區（滿刻度約 512）
+// 雙 Joy-Con：左 Joy-Con 往上推應該前進、右 Joy-Con 往右推應該右轉，相反就改成 true
+constexpr bool JOYCON_THROTTLE_INVERTED = false;
+constexpr bool JOYCON_STEER_INVERTED = false;
 
 // ===== 防撞輔助（手動模式）=====
 constexpr int ASSIST_STOP_CM = 15;       // 正前方小於此距離：禁止前進
