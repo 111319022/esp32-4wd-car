@@ -9,7 +9,8 @@
 #define FEATURE_BATTERY_MONITOR 1  // 電池電壓監測（GPIO 39，需 20kΩ + 10kΩ 分壓）
 #define FEATURE_LIGHTS 0           // 選配：頭燈、煞車燈
 #define FEATURE_BUZZER 0           // 選配：蜂鳴器喇叭
-#define DEBUG_SERIAL 1             // 每 200 ms 在序列埠印出狀態
+#define DEBUG_SERIAL 1             // 每 200 ms 在序列埠印出狀態（給人看）
+#define DEBUG_STREAM 1             // 每 DEBUG_STREAM_MS 印一行「GP ...」給 tools/gamepad_monitor.html 讀
 
 // ===== 腳位：L298N 馬達驅動 =====
 // 左側兩顆馬達並聯接 A 通道（OUT1/OUT2），右側兩顆並聯接 B 通道（OUT3/OUT4）
@@ -93,3 +94,7 @@ constexpr float BATTERY_LOW_V = 7.0f;          // 3.5 V／顆：手把震動提�
 constexpr float BATTERY_CRITICAL_V = 6.6f;     // 3.3 V／顆：停車保護電池（LG MJ1 沒有保護板）
 constexpr unsigned long BATTERY_CRITICAL_HOLD_MS = 3000;  // 連續低於 CRITICAL 這麼久就鎖定停車，重開機才解除
 constexpr float BATTERY_ABSENT_V = 5.0f;       // 低於此值視為沒接電池（只插 USB），不鎖定
+
+// ===== 除錯輸出 =====
+constexpr unsigned long DEBUG_SERIAL_MS = 200;  // DEBUG_SERIAL：給人看的狀態行間隔
+constexpr unsigned long DEBUG_STREAM_MS = 100;  // DEBUG_STREAM：給 tools/gamepad_monitor.html 讀的「GP ...」行間隔

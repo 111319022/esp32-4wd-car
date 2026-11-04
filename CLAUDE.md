@@ -70,6 +70,8 @@ firmware/
     battery.*         電池電壓監測
     extras.*          選配車燈與喇叭
   tests/              單項測試 sketch（每個都獨立，腳位常數要與 config.h 一致）
+tools/
+  gamepad_monitor.html  手把監看網頁（Chrome／Edge 的 Web Serial 讀 car_main 的「GP」行）
 ```
 
 ## 控制邏輯摘要（細節見 docs/software.md）

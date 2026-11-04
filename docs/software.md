@@ -25,7 +25,7 @@
 4. 依模式算出左右輪速度（%）
 5. 電池保護覆寫速度
 6. `motorsSetPercent()` 輸出到 L298N
-7. 每 200 ms 在序列埠印出狀態（`DEBUG_SERIAL`）
+7. 每 200 ms 在序列埠印出給人看的狀態（`DEBUG_SERIAL`），每 100 ms 印一行給監看網頁讀的 `GP ...`（`DEBUG_STREAM`），見下方「除錯輸出」
 
 **不可長時間阻塞**：超音波的 `pulseIn` 最多阻塞約 20 ms，這已經是上限。需要計時的動作（例如後退 0.5 秒）一律用 `millis()` 寫成狀態機。
 
@@ -139,6 +139,30 @@ TURN 回到 CRUISE 的條件是正前 > `AUTO_FRONT_CM + AUTO_CLEAR_MARGIN_CM`�
 
 為什麼要鎖定：停車後電池不再出力，電壓會回升到 6.6 V 以上；不鎖定的話車子會「跑 → 壓降 → 停 → 回升 → 又跑」反覆循環，持續過度放電。鎖定後序列埠會印出 `[battery] ... 停車鎖定`。
 電壓低於 `BATTERY_ABSENT_V`（5.0 V）視為沒接電池（例如燒錄時只插 USB、電池開關關著），這時不會開車但也不鎖定，打開電池開關就能正常使用。
+
+## 除錯輸出與手把監看網頁
+
+`tools/gamepad_monitor.html` 是測試用的網頁：用電腦版 **Chrome 或 Edge** 直接打開檔案，按「連接 ESP32」選序列埠，就會即時顯示兩支手把的狀態、搖桿值、按鍵、判讀結果（向前、原地右轉……）、左右輪速度、超音波距離與電池，並可下載 LOG。沒有 ESP32 時可以按「示範模式」看畫面。Safari、Firefox 不支援 Web Serial。使用網頁時，Arduino IDE 的序列埠監控視窗要關掉（同一個序列埠只能被一個程式打開）。
+
+`car_main` 每 `DEBUG_STREAM_MS`（100 ms）印一行，空白分隔的 `key=value`：
+
+```
+GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=0 zr=0 a=0 b=0 plus=0 cl=0 cr=0 ol=0 or=0 dl=300 dc=300 dr=300 bat=0.43 low=1 crit=1
+```
+
+| 欄位 | 意義 |
+|---|---|
+| `pad` | 1 = 可以開車（兩支 Joy-Con 都就緒，或 Pro 手把就緒） |
+| `jl`／`jr`／`pro` | 左 Joy-Con／右 Joy-Con／Pro 手把：0 未連線、1 歸零中、2 就緒 |
+| `mode`／`auto` | `MAN` 手動／`AUTO` 自動；自動避障狀態機目前狀態 |
+| `T`／`S` | 歸零、死區之後的油門／轉向（−512～512） |
+| `zr`／`a`／`b`／`plus` | 按鍵是否按住 |
+| `cl`／`cr` | 左右輪速度指令（%），電池保護覆寫**之前** |
+| `ol`／`or` | 實際輸出到 L298N 的速度（%） |
+| `dl`／`dc`／`dr` | 左前／正前／右前距離（cm），300 = 沒有回波 |
+| `bat`／`low`／`crit` | 電池電壓；是否低於 `BATTERY_LOW_V`；是否觸發停車保護 |
+
+只插 USB 沒接電池時 `crit=1`，`ol`／`or` 會一直是 0，看 `cl`／`cr` 就知道車子本來要怎麼走。要改欄位時，`car_main.ino` 和網頁的 `parseGp()` 要一起改。
 
 ## 參數調整指南
 

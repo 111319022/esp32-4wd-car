@@ -18,6 +18,7 @@ enum class DriveMode { MANUAL, AUTO };
 
 DriveMode mode = DriveMode::MANUAL;
 unsigned long lastDebugMs = 0;
+unsigned long lastStreamMs = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -63,6 +64,8 @@ void loop() {
   int rightCm = sonarCm(SONAR_RIGHT);
   int leftPct = 0;
   int rightPct = 0;
+  int cmdLeftPct = 0;   // 電池保護覆寫之前的速度指令（除錯用：只插 USB 時看得到車子「本來要怎麼走」）
+  int cmdRightPct = 0;
 
   if (!gp.connected) {
     // 斷線保護：沒有手把就一律停車，回到手動模式
@@ -82,6 +85,9 @@ void loop() {
       autopilotStep(leftCm, centerCm, rightCm, leftPct, rightPct);
     }
 
+    cmdLeftPct = leftPct;
+    cmdRightPct = rightPct;
+
     if (batteryCritical()) {
       // LG MJ1 沒有保護板，電壓太低一定要停車，避免電池過度放電
       leftPct = rightPct = 0;
@@ -94,14 +100,27 @@ void loop() {
     extrasUpdate(gp.lightTogglePressed, gp.hornHeld, leftPct == 0 && rightPct == 0, leftPct < 0 && rightPct < 0);
   }
 
-#if DEBUG_SERIAL
   unsigned long now = millis();
-  if (now - lastDebugMs >= 200) {
+#if DEBUG_SERIAL
+  if (now - lastDebugMs >= DEBUG_SERIAL_MS) {
     lastDebugMs = now;
     // T／S 是歸零、死區之後的搖桿值（-512～512），只插 USB 時電池保護會讓 out 一直是 0，看 T／S 就好
     Serial.printf("pad=%d mode=%s auto=%s | T=%4d S=%4d%s | L=%3d C=%3d R=%3d cm | out L=%4d R=%4d %% | bat=%.2fV\n",
                   gp.connected, mode == DriveMode::AUTO ? "AUTO" : "MAN", autopilotStateName(), gp.throttle,
                   gp.steer, gp.boost ? " ZR" : "", leftCm, centerCm, rightCm, leftPct, rightPct, batteryVolts());
+  }
+#endif
+
+#if DEBUG_STREAM
+  // 給 tools/gamepad_monitor.html 讀的機器格式：「GP」開頭、空白分隔的 key=value，欄位說明見 docs/software.md
+  if (now - lastStreamMs >= DEBUG_STREAM_MS) {
+    lastStreamMs = now;
+    Serial.printf("GP pad=%d jl=%d jr=%d pro=%d mode=%s auto=%s T=%d S=%d zr=%d a=%d b=%d plus=%d "
+                  "cl=%d cr=%d ol=%d or=%d dl=%d dc=%d dr=%d bat=%.2f low=%d crit=%d\n",
+                  gp.connected, gamepadSlotStatus(PAD_SLOT_LEFT), gamepadSlotStatus(PAD_SLOT_RIGHT),
+                  gamepadSlotStatus(PAD_SLOT_PRO), mode == DriveMode::AUTO ? "AUTO" : "MAN", autopilotStateName(),
+                  gp.throttle, gp.steer, gp.boost, gp.hornHeld, gp.lightHeld, gp.plusHeld, cmdLeftPct, cmdRightPct,
+                  leftPct, rightPct, leftCm, centerCm, rightCm, batteryVolts(), batteryLow(), batteryCritical());
   }
 #endif
 

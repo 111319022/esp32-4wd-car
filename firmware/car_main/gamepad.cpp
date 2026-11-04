@@ -277,6 +277,8 @@ void gamepadUpdate() {
   if (next.connected) {
     next.modeTogglePressed = plus && !prevPlus;
     next.lightTogglePressed = b && !prevB;
+    next.plusHeld = plus;
+    next.lightHeld = b;
   }
   prevPlus = plus;
   prevB = b;
@@ -285,6 +287,13 @@ void gamepadUpdate() {
 
 const GamepadState& gamepadState() {
   return state;
+}
+
+GamepadSlotStatus gamepadSlotStatus(GamepadSlotId slotId) {
+  Slot slot = static_cast<Slot>(slotId);
+  ControllerPtr ctl = slot == SLOT_LEFT ? joyLeft : slot == SLOT_RIGHT ? joyRight : pro;
+  if (!isUsable(ctl)) return PAD_ABSENT;
+  return calibrations[slot].done ? PAD_READY : PAD_CALIBRATING;
 }
 
 void gamepadRumble(int durationMs) {

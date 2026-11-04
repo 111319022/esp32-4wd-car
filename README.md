@@ -33,7 +33,7 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
 1. 照 [`docs/setup.md`](docs/setup.md) 安裝 Arduino IDE 和 Bluepad32 開發板套件。
 2. 照 [`docs/hardware.md`](docs/hardware.md) 接線，**第一次通電前先做「通電檢查」**。
 3. 依序跑 [`firmware/tests/`](firmware/tests/) 的單項測試（步驟見 [`docs/testing.md`](docs/testing.md)）。
-4. 打開 `firmware/car_main/car_main.ino` 上傳主程式。
+4. 打開 `firmware/car_main/car_main.ino` 上傳主程式。用 Chrome 打開 [`tools/gamepad_monitor.html`](tools/gamepad_monitor.html) 可以即時看手把讀值與判讀結果。
 5. 左右兩支 Joy-Con 各按住側邊滑軌上的同步鍵配對，兩支都連上、搖桿歸零完成後就能開車（連線時先不要碰搖桿）。
 
 ## 文件

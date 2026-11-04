@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>四驅車手把監看</title>
+<!--
+  四驅車手把監看（tools/gamepad_monitor.html）
+  用 Chrome／Edge 直接開這個檔案 → 按「連接 ESP32」選 ESP32 的序列埠（115200）。
+  讀取 car_main 每 100 ms 印出的「GP ...」行（config.h 的 DEBUG_STREAM），即時顯示搖桿、按鍵、判讀結果。
+  沒有 ESP32 時可以按「示範模式」看畫面。欄位說明見 docs/software.md「除錯輸出」。
+-->
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1c1f24;
+    --muted: #667085;
+    --border: #e1e4ea;
+    --track: #e9ecf1;
+    --accent: #2563eb;
+    --accent-soft: #dbe7ff;
+    --ok: #15803d;
+    --ok-soft: #dcfce7;
+    --warn: #b45309;
+    --warn-soft: #fef3c7;
+    --bad: #b91c1c;
+    --bad-soft: #fee2e2;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111318;
+      --panel: #1a1d24;
+      --text: #e6e8ec;
+      --muted: #9aa3b2;
+      --border: #2a2f39;
+      --track: #262b34;
+      --accent: #60a5fa;
+      --accent-soft: #1e3a5f;
+      --ok: #4ade80;
+      --ok-soft: #14361f;
+      --warn: #fbbf24;
+      --warn-soft: #3d2f0c;
+      --bad: #f87171;
+      --bad-soft: #3f1515;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+    padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 2;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button {
+    font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .conn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.on { background: var(--ok); }
+  .dot.demo { background: var(--warn); }
+  main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; display: grid; gap: 16px; }
+  .notice { padding: 10px 14px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 14px; }
+  .notice.hidden { display: none; }
+  .grid { display: grid; gap: 16px; }
+  .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .g2 { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 900px) { .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g2, .g3 { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; min-width: 0; }
+  .card h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 10px; letter-spacing: .02em; }
+  .big { font-size: 22px; font-weight: 700; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  .pill.idle { background: var(--track); color: var(--muted); }
+  .pads { display: grid; gap: 6px; }
+  .pads div { display: flex; justify-content: space-between; align-items: center; }
+
+  /* 判讀 */
+  .verdict { display: flex; gap: 18px; align-items: center; }
+  .arrow {
+    width: 96px; height: 96px; flex: none; border-radius: 50%; background: var(--track);
+    display: grid; place-items: center; transition: background .15s;
+  }
+  .arrow svg { width: 60px; height: 60px; transition: transform .15s; }
+  .arrow.active { background: var(--accent-soft); }
+  .arrow.stopped svg { opacity: .35; }
+  .verdict-text { font-size: 30px; font-weight: 800; line-height: 1.2; }
+  .reasons { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+  .reasons li { font-size: 14px; padding: 4px 10px; border-radius: 8px; background: var(--track); }
+  .reasons li.warn { background: var(--warn-soft); color: var(--warn); }
+  .reasons li.bad { background: var(--bad-soft); color: var(--bad); }
+
+  /* 搖桿 */
+  .sticks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .stick { display: grid; gap: 8px; justify-items: center; text-align: center; }
+  .vbar, .hbar { position: relative; background: var(--track); border-radius: 10px; overflow: hidden; }
+  .vbar { width: 46px; height: 170px; }
+  .hbar { width: 100%; max-width: 220px; height: 46px; margin: 62px 0; }
+  .vbar .fill, .hbar .fill { position: absolute; background: var(--accent); opacity: .85; }
+  .vbar .mid { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--border); }
+  .hbar .mid { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--border); }
+  .dz { position: absolute; background: var(--muted); opacity: .12; }
+  .val { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .stick .label { font-weight: 600; }
+
+  /* 輪子 */
+  .wheels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .wheel { display: grid; justify-items: center; gap: 6px; text-align: center; }
+  .wbars { display: flex; gap: 8px; }
+  .wbar { position: relative; width: 34px; height: 170px; background: var(--track); border-radius: 8px; overflow: hidden; }
+  .wbar .fill { position: absolute; left: 0; right: 0; }
+  .wbar.cmd .fill { background: var(--accent); opacity: .5; }
+  .wbar.out .fill { background: var(--ok); }
+  .wbar .mid { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--border); }
+  .legend { display: flex; gap: 14px; justify-content: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  /* 按鍵 */
+  .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .key {
+    display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center;
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px; transition: background .1s, border-color .1s;
+  }
+  .key .cap {
+    width: 54px; height: 54px; border-radius: 12px; background: var(--track);
+    display: grid; place-items: center; font-weight: 800; font-size: 17px;
+  }
+  .key.held { background: var(--accent-soft); border-color: var(--accent); }
+  .key.held .cap { background: var(--accent); color: #fff; }
+  .key .name { font-weight: 700; }
+  .key .desc { font-size: 13px; color: var(--muted); }
+  .key .where { font-size: 12px; color: var(--muted); }
+
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  code, .mono { font-family: var(--mono); font-size: 13px; }
+
+  /* 距離 */
+  .sonar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+  .sonar div { background: var(--track); border-radius: 10px; padding: 8px 4px; }
+  .sonar .cm { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .sonar .near { background: var(--bad-soft); color: var(--bad); }
+  .sonar .mid2 { background: var(--warn-soft); color: var(--warn); }
+
+  /* LOG */
+  .logbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .logbar label { font-size: 13px; color: var(--muted); display: inline-flex; gap: 5px; align-items: center; }
+  #log {
+    height: 300px; overflow: auto; margin: 0; padding: 10px; border-radius: 10px;
+    background: var(--track); font-family: var(--mono); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-all;
+  }
+  #log .t { color: var(--muted); }
+  #log .gp { color: var(--muted); }
+  #log .ev { color: var(--accent); font-weight: 600; }
+  #log .err { color: var(--bad); }
+  #raw { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>四驅車手把監看</h1>
+    <div class="sub">讀取 ESP32 序列埠（115200）的 car_main 除錯輸出，即時顯示搖桿、按鍵與判讀</div>
+  </div>
+  <div class="controls">
+    <span class="conn"><span id="connDot" class="dot"></span><span id="connText">未連接</span></span>
+    <button id="btnConnect" class="primary">連接 ESP32</button>
+    <button id="btnReset" disabled title="用 RTS 讓 ESP32 重開機（等同按 EN 鍵）">重開機 ESP32</button>
+    <button id="btnDisconnect" disabled>中斷連接</button>
+    <button id="btnDemo">示範模式</button>
+  </div>
+</header>
+
+<main>
+  <div id="noSerial" class="notice hidden">
+    這個瀏覽器不支援 Web Serial。請用電腦版 <b>Chrome</b> 或 <b>Edge</b> 開啟這個檔案（Safari、Firefox 不支援）。仍可使用「示範模式」看畫面。
+  </div>
+  <div id="noStream" class="notice hidden">
+    已連接，但還沒收到「GP」資料行。請確認燒錄的是新版 <code>car_main</code>，且 <code>config.h</code> 的 <code>DEBUG_STREAM</code> 為 1；如果剛連上，可以按「重開機 ESP32」。
+  </div>
+
+  <section class="grid g4">
+    <div class="card">
+      <h2>手把</h2>
+      <div class="pads">
+        <div><span>左 Joy-Con</span><span id="padL" class="pill idle">—</span></div>
+        <div><span>右 Joy-Con</span><span id="padR" class="pill idle">—</span></div>
+        <div><span>Pro 手把（備用）</span><span id="padP" class="pill idle">—</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>可以開車嗎</h2>
+      <div id="driveOk" class="big muted">—</div>
+      <div id="driveWhy" class="small muted"></div>
+    </div>
+    <div class="card">
+      <h2>模式</h2>
+      <div id="mode" class="big">—</div>
+      <div id="autoState" class="small muted"></div>
+    </div>
+    <div class="card">
+      <h2>電池</h2>
+      <div id="bat" class="big">—</div>
+      <div id="batWhy" class="small muted"></div>
+    </div>
+  </section>
+
+  <section class="grid g2">
+    <div class="card">
+      <h2>判讀結果</h2>
+      <div class="verdict">
+        <div id="arrowBox" class="arrow stopped">
+          <svg id="arrowSvg" viewBox="0 0 60 60" aria-hidden="true">
+            <path id="arrowPath" d="M30 6 L50 30 H38 V54 H22 V30 H10 Z" fill="currentColor"></path>
+          </svg>
+        </div>
+        <div>
+          <div id="verdict" class="verdict-text">等待資料</div>
+          <div id="speedLimit" class="small muted"></div>
+        </div>
+      </div>
+      <ul id="reasons" class="reasons"></ul>
+    </div>
+    <div class="card">
+      <h2>前方距離（超音波）</h2>
+      <div class="sonar">
+        <div id="sL"><div class="small">左前 −30°</div><div class="cm" id="dL">—</div></div>
+        <div id="sC"><div class="small">正前 0°</div><div class="cm" id="dC">—</div></div>
+        <div id="sR"><div class="small">右前 +30°</div><div class="cm" id="dR">—</div></div>
+      </div>
+      <p class="small muted" style="margin:10px 0 0">沒接超音波時會一直顯示 300 cm（量不到回波），屬正常。手動模式下正前方 &lt; 15 cm 會禁止前進。</p>
+    </div>
+  </section>
+
+  <section class="grid g2">
+    <div class="card">
+      <h2>搖桿（已歸零、套用死區，範圍 −512～512）</h2>
+      <div class="sticks">
+        <div class="stick">
+          <div class="label">左 Joy-Con 上下 → 油門 T</div>
+          <div class="vbar"><div class="dz" id="dzT"></div><div class="mid"></div><div class="fill" id="fillT"></div></div>
+          <div class="val" id="valT">—</div>
+          <div class="small muted" id="txtT"></div>
+        </div>
+        <div class="stick">
+          <div class="label">右 Joy-Con 左右 → 轉向 S</div>
+          <div class="hbar"><div class="dz" id="dzS"></div><div class="mid"></div><div class="fill" id="fillS"></div></div>
+          <div class="val" id="valS">—</div>
+          <div class="small muted" id="txtS"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>左右輪速度（%）</h2>
+      <div class="wheels">
+        <div class="wheel">
+          <div class="wbars">
+            <div class="wbar cmd"><div class="mid"></div><div class="fill" id="fCL"></div></div>
+            <div class="wbar out"><div class="mid"></div><div class="fill" id="fOL"></div></div>
+          </div>
+          <div class="label"><b>左輪</b></div>
+          <div class="mono small" id="txtL">—</div>
+        </div>
+        <div class="wheel">
+          <div class="wbars">
+            <div class="wbar cmd"><div class="mid"></div><div class="fill" id="fCR"></div></div>
+            <div class="wbar out"><div class="mid"></div><div class="fill" id="fOR"></div></div>
+          </div>
+          <div class="label"><b>右輪</b></div>
+          <div class="mono small" id="txtR">—</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--accent);opacity:.5"></span>指令（電池保護前）</span>
+        <span><span class="sw" style="background:var(--ok)"></span>實際輸出到 L298N</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>按鍵（按住時會亮）</h2>
+    <div class="keys">
+      <div class="key" id="kZR"><div class="cap">ZR</div><div><div class="name">加速</div><div class="desc">按住時速度上限 60% → 100%</div><div class="where">右 Joy-Con 背面扳機・r2()</div></div></div>
+      <div class="key" id="kPlus"><div class="cap">＋</div><div><div class="name">切換手動／自動避障</div><div class="desc">每按一次切換；手把斷線一律回到手動</div><div class="where">右 Joy-Con・misc 0x04</div></div></div>
+      <div class="key" id="kA"><div class="cap">A</div><div><div class="name">喇叭（選配）</div><div class="desc">按住響；需 config.h 的 FEATURE_BUZZER = 1</div><div class="where">右 Joy-Con・a()</div></div></div>
+      <div class="key" id="kB"><div class="cap">B</div><div><div class="name">車燈開關（選配）</div><div class="desc">按一下切換頭燈；需 FEATURE_LIGHTS = 1</div><div class="where">右 Joy-Con・x()</div></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>完整操作對照表</h2>
+    <table>
+      <thead><tr><th>操作</th><th>功能</th><th>測試時看什麼</th></tr></thead>
+      <tbody>
+        <tr><td>左 Joy-Con 搖桿往上／往下</td><td>油門：前進／後退</td><td>T 變正／變負，判讀顯示「向前／向後」</td></tr>
+        <tr><td>右 Joy-Con 搖桿往右／往左</td><td>轉向：右轉／左轉（坦克式：左輪 = T + S、右輪 = T − S）</td><td>S 變正／變負；只推轉向時顯示「原地右轉／左轉」</td></tr>
+        <tr><td>同時推油門與轉向</td><td>邊走邊轉</td><td>顯示「向前偏右」等，兩輪速度不同</td></tr>
+        <tr><td>按住 ZR</td><td>加速：速度上限 60% → 100%</td><td>ZR 亮起，速度上限顯示 100%</td></tr>
+        <tr><td>按「＋」</td><td>切換手動／自動避障</td><td>模式卡片變成「自動避障」</td></tr>
+        <tr><td>A（按住）</td><td>喇叭（選配）</td><td>A 亮起；有接蜂鳴器且開啟 FEATURE_BUZZER 才會響</td></tr>
+        <tr><td>B（按一下）</td><td>車燈開關（選配）</td><td>B 亮起；有接燈且開啟 FEATURE_LIGHTS 才會亮</td></tr>
+        <tr><td>連上後放著不動 0.5 秒</td><td>搖桿自動歸零</td><td>手把狀態從「歸零中」變「就緒」，放開搖桿時 T、S 都是 0</td></tr>
+        <tr><td>關掉任一支 Joy-Con</td><td>斷線保護：立刻停車、回到手動</td><td>1 秒內「可以開車嗎」變成「不行」、輸出歸零</td></tr>
+        <tr><td>正前方 &lt; 15 cm 時往前推</td><td>防撞輔助：禁止前進、手把震動（可後退、可原地轉）</td><td>判讀出現「防撞：禁止前進」</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted" style="margin:10px 0 0">
+      備用 Pro 手把：左搖桿上下 = 油門、右搖桿左右 = 轉向，ZR／＋／A／B 功能相同（A/B 實際對應待測）。
+      只插 USB 沒接電池時，電池保護會把「實際輸出」歸零、手把會一直小震動，屬正常；看「指令」欄就知道車子本來要怎麼走。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>LOG</h2>
+    <div class="logbar">
+      <button id="btnPause">暫停</button>
+      <button id="btnClear">清除</button>
+      <button id="btnSave">下載 LOG</button>
+      <label><input type="checkbox" id="chkGp"> 顯示 GP 資料行</label>
+      <label><input type="checkbox" id="chkPad"> 顯示 pad= 狀態行</label>
+      <label><input type="checkbox" id="chkScroll" checked> 自動捲動</label>
+      <span id="rate" class="small muted"></span>
+    </div>
+    <pre id="log"></pre>
+    <div id="raw"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+// ===== 和韌體對應的常數（config.h）=====
+const DEADZONE = 40;               // STICK_DEADZONE
+const SPEED_NORMAL = 60;           // SPEED_LIMIT_NORMAL_PCT
+const SPEED_BOOST = 100;           // SPEED_LIMIT_BOOST_PCT
+const ASSIST_STOP_CM = 15;         // ASSIST_STOP_CM
+const ASSIST_WARN_SIDE_CM = 10;    // ASSIST_WARN_SIDE_CM
+const BATTERY_ABSENT_V = 5.0;      // BATTERY_ABSENT_V
+const STREAM_TIMEOUT_MS = 1500;    // 超過這麼久沒收到 GP 行就顯示「資料中斷」
+const MAX_LOG_LINES = 1500;        // 畫面上最多保留幾行
+const MAX_SAVE_LINES = 50000;      // 下載 LOG 最多保留幾行
+
+const $ = (id) => document.getElementById(id);
+
+// ===== 狀態 =====
+let port = null;
+let reader = null;
+let keepReading = false;
+let demoTimer = null;
+let paused = false;
+let lastGpAt = 0;
+let gpCount = 0;
+let gpCountWindowStart = performance.now();
+let lastGp = null;
+let prev = null;
+const savedLines = [];
+const logLines = [];
+
+// ===== 解析 =====
+// 例：GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=12 zr=0 a=0 b=0 plus=0 cl=0 cr=0 ol=0 or=0 dl=300 dc=300 dr=300 bat=0.43 low=1 crit=1
+function parseGp(line) {
+  const out = {};
+  for (const tok of line.trim().split(/\s+/).slice(1)) {
+    const eq = tok.indexOf("=");
+    if (eq < 0) continue;
+    const k = tok.slice(0, eq);
+    const v = tok.slice(eq + 1);
+    out[k] = (k === "mode" || k === "auto") ? v : Number(v);
+  }
+  return out;
+}
+
+function onLine(line) {
+  line = line.replace(/\r$/, "");
+  if (!line) return;
+  const now = new Date();
+  const stamp = now.toTimeString().slice(0, 8) + "." + String(now.getMilliseconds()).padStart(3, "0");
+  if (savedLines.length < MAX_SAVE_LINES) savedLines.push(stamp + "  " + line);
+
+  if (line.startsWith("GP ")) {
+    const d = parseGp(line);
+    lastGpAt = performance.now();
+    gpCount++;
+    $("raw").textContent = line;
+    detectEvents(d, stamp);
+    render(d);
+    addLog(stamp, line, "gp");
+  } else if (line.startsWith("pad=")) {
+    addLog(stamp, line, "pad");
+  } else {
+    const cls = /error|fail|失敗|斷線|invalid|unexpected/i.test(line) ? "err" : "";
+    addLog(stamp, line, cls);
+  }
+}
+
+// 從前後兩筆資料找出按鍵、模式、連線的變化，寫成事件
+function detectEvents(d, stamp) {
+  if (prev) {
+    const ev = [];
+    const keyName = { zr: "ZR", plus: "＋", a: "A", b: "B" };
+    for (const k of Object.keys(keyName)) {
+      if (d[k] && !prev[k]) ev.push(`按下 ${keyName[k]}`);
+      if (!d[k] && prev[k]) ev.push(`放開 ${keyName[k]}`);
+    }
+    if (d.mode !== prev.mode) ev.push(`模式 → ${d.mode === "AUTO" ? "自動避障" : "手動"}`);
+    if (d.pad !== prev.pad) ev.push(d.pad ? "手把就緒，可以開車" : "手把未就緒 → 停車");
+    const names = { jl: "左 Joy-Con", jr: "右 Joy-Con", pro: "Pro 手把" };
+    for (const k of Object.keys(names)) {
+      if (d[k] !== prev[k]) ev.push(`${names[k]}：${padText(d[k])}`);
+    }
+    const dirNow = verdictOf(d).text;
+    const dirPrev = verdictOf(prev).text;
+    if (dirNow !== dirPrev) ev.push(`判讀：${dirNow}`);
+    for (const e of ev) addLog(stamp, "▶ " + e, "ev");
+  }
+  prev = d;
+}
+
+// ===== 判讀 =====
+function padText(s) {
+  return s === 2 ? "就緒" : s === 1 ? "歸零中（別碰搖桿）" : "未連線";
+}
+
+// 依左右輪「指令」判斷車子會怎麼走（自動模式也適用）
+function verdictOf(d) {
+  if (!d.pad) return { text: "停車（手把未就緒）", angle: null };
+  const cl = d.cl, cr = d.cr;
+  if (cl === 0 && cr === 0) return { text: "停止", angle: null };
+  const fwd = (cl + cr) / 2;      // 前進分量
+  const rot = (cl - cr) / 2;      // 旋轉分量：正值 = 車頭往右
+  if (Math.abs(fwd) >= Math.abs(rot)) {
+    const dir = fwd > 0 ? "向前" : "向後";
+    let side = "";
+    if (rot > 4) side = "偏右";
+    else if (rot < -4) side = "偏左";
+    // 箭頭角度：前進 0°、後退 180°，再依旋轉分量偏一點
+    const base = fwd > 0 ? 0 : 180;
+    const tilt = Math.max(-40, Math.min(40, (rot / Math.max(1, Math.abs(fwd))) * 45));
+    return { text: dir + side, angle: fwd > 0 ? base + tilt : base - tilt };
+  }
+  return rot > 0 ? { text: "原地右轉", angle: 90, spin: true } : { text: "原地左轉", angle: -90, spin: true };
+}
+
+function reasonsOf(d) {
+  const r = [];
+  if (!d.pad) {
+    if (d.pro === 0 && (d.jl === 0 || d.jr === 0)) r.push(["bad", "需要左右兩支 Joy-Con 都連上（或一支 Pro 手把）"]);
+    if (d.jl === 1 || d.jr === 1 || d.pro === 1) r.push(["warn", "搖桿歸零中：放開搖桿、手把放著別動"]);
+    return r;
+  }
+  if (d.mode === "AUTO") r.push(["", `自動避障中（狀態 ${d.auto}），搖桿不影響行駛；按「＋」回到手動`]);
+  if (d.mode === "MAN" && d.dc < ASSIST_STOP_CM && d.T > 0) r.push(["warn", `防撞：正前方 ${d.dc} cm，禁止前進（可後退、可原地轉）`]);
+  if (d.mode === "MAN" && Math.min(d.dl, d.dr) < ASSIST_WARN_SIDE_CM) r.push(["warn", `側邊太近（左前 ${d.dl}／右前 ${d.dr} cm），手把震動提醒`]);
+  if (d.crit) {
+    if (d.bat < BATTERY_ABSENT_V) r.push(["", "沒接電池（只插 USB）：電池保護讓實際輸出 = 0，屬正常，看「指令」即可"]);
+    else r.push(["bad", `電池電壓過低（${d.bat.toFixed(2)} V）：強制停車`]);
+  } else if (d.low) {
+    r.push(["warn", `電池偏低（${d.bat.toFixed(2)} V）：手把震動提醒`]);
+  }
+  return r;
+}
+
+// ===== 畫面 =====
+function setPill(el, status) {
+  el.textContent = padText(status);
+  el.className = "pill " + (status === 2 ? "ok" : status === 1 ? "warn" : "idle");
+}
+
+function setV(fill, value, range) {
+  // 垂直條：value 正值往上長、負值往下長
+  const pct = Math.min(1, Math.abs(value) / range) * 50;
+  fill.style.left = "0"; fill.style.right = "0";
+  if (value >= 0) { fill.style.bottom = "50%"; fill.style.top = ""; }
+  else { fill.style.top = "50%"; fill.style.bottom = ""; }
+  fill.style.height = pct + "%";
+}
+
+function setH(fill, value, range) {
+  const pct = Math.min(1, Math.abs(value) / range) * 50;
+  fill.style.top = "0"; fill.style.bottom = "0";
+  if (value >= 0) { fill.style.left = "50%"; fill.style.right = ""; }
+  else { fill.style.right = "50%"; fill.style.left = ""; }
+  fill.style.width = pct + "%";
+}
+
+function setupDeadzones() {
+  const h = (DEADZONE / 512) * 50;
+  Object.assign($("dzT").style, { left: "0", right: "0", top: (50 - h) + "%", height: (2 * h) + "%" });
+  Object.assign($("dzS").style, { top: "0", bottom: "0", left: (50 - h) + "%", width: (2 * h) + "%" });
+}
+
+function render(d) {
+  lastGp = d;
+  $("noStream").classList.add("hidden");
+
+  setPill($("padL"), d.jl);
+  setPill($("padR"), d.jr);
+  setPill($("padP"), d.pro);
+
+  $("driveOk").textContent = d.pad ? "可以" : "不行";
+  $("driveOk").className = "big " + (d.pad ? "" : "muted");
+  $("driveOk").style.color = d.pad ? "var(--ok)" : "var(--bad)";
+  $("driveWhy").textContent = d.pad
+    ? (d.pro === 2 ? "使用 Pro 手把" : "兩支 Joy-Con 都就緒")
+    : "斷線保護：停車中";
+
+  $("mode").textContent = d.mode === "AUTO" ? "自動避障" : "手動";
+  $("autoState").textContent = d.mode === "AUTO" ? `避障狀態：${d.auto}` : "按「＋」切換到自動避障";
+
+  $("bat").textContent = d.bat.toFixed(2) + " V";
+  $("batWhy").textContent = d.bat < BATTERY_ABSENT_V ? "沒接電池（只插 USB）"
+    : d.crit ? "過低：強制停車" : d.low ? "偏低：震動提醒" : "正常";
+  $("bat").style.color = d.bat < BATTERY_ABSENT_V ? "var(--muted)" : d.crit ? "var(--bad)" : d.low ? "var(--warn)" : "var(--ok)";
+
+  // 判讀
+  const v = verdictOf(d);
+  $("verdict").textContent = v.text;
+  const box = $("arrowBox");
+  box.classList.toggle("stopped", v.angle === null);
+  box.classList.toggle("active", v.angle !== null);
+  $("arrowPath").setAttribute("d", v.spin
+    ? "M30 8 A22 22 0 1 1 9.5 22 L3 22 L13 10 L22 22 L15.5 22 A16 16 0 1 0 30 14 Z"
+    : "M30 6 L50 30 H38 V54 H22 V30 H10 Z");
+  $("arrowSvg").style.transform = v.spin
+    ? (v.angle < 0 ? "scaleX(-1)" : "none")
+    : `rotate(${v.angle ?? 0}deg)`;
+  const limit = d.zr ? SPEED_BOOST : SPEED_NORMAL;
+  $("speedLimit").textContent = d.pad ? `速度上限 ${limit}%${d.zr ? "（ZR 加速中）" : ""}` : "";
+
+  const ul = $("reasons");
+  ul.innerHTML = "";
+  for (const [cls, text] of reasonsOf(d)) {
+    const li = document.createElement("li");
+    if (cls) li.className = cls;
+    li.textContent = text;
+    ul.appendChild(li);
+  }
+
+  // 搖桿
+  setV($("fillT"), d.T, 512);
+  setH($("fillS"), d.S, 512);
+  $("valT").textContent = (d.T > 0 ? "+" : "") + d.T;
+  $("valS").textContent = (d.S > 0 ? "+" : "") + d.S;
+  $("txtT").textContent = d.T > 0 ? "前進" : d.T < 0 ? "後退" : "放開（0）";
+  $("txtS").textContent = d.S > 0 ? "右轉" : d.S < 0 ? "左轉" : "放開（0）";
+
+  // 輪子
+  setV($("fCL"), d.cl, 100);
+  setV($("fOL"), d.ol, 100);
+  setV($("fCR"), d.cr, 100);
+  setV($("fOR"), d.or, 100);
+  $("txtL").textContent = `指令 ${d.cl}%｜輸出 ${d.ol}%`;
+  $("txtR").textContent = `指令 ${d.cr}%｜輸出 ${d.or}%`;
+
+  // 按鍵
+  $("kZR").classList.toggle("held", !!d.zr);
+  $("kPlus").classList.toggle("held", !!d.plus);
+  $("kA").classList.toggle("held", !!d.a);
+  $("kB").classList.toggle("held", !!d.b);
+
+  // 距離
+  setSonar("sL", "dL", d.dl);
+  setSonar("sC", "dC", d.dc);
+  setSonar("sR", "dR", d.dr);
+}
+
+function setSonar(boxId, valId, cm) {
+  $(valId).textContent = cm >= 300 ? "300+" : cm;
+  $(boxId).className = cm < ASSIST_STOP_CM ? "near" : cm < 30 ? "mid2" : "";
+}
+
+// ===== LOG =====
+function addLog(stamp, text, cls) {
+  logLines.push({ stamp, text, cls });
+  if (logLines.length > MAX_LOG_LINES) logLines.splice(0, logLines.length - MAX_LOG_LINES);
+  if (!paused) scheduleLogRender();
+}
+
+let logRenderPending = false;
+function scheduleLogRender() {
+  if (logRenderPending) return;
+  logRenderPending = true;
+  requestAnimationFrame(() => { logRenderPending = false; renderLog(); });
+}
+
+function renderLog() {
+  const showGp = $("chkGp").checked;
+  const showPad = $("chkPad").checked;
+  const el = $("log");
+  const frag = document.createDocumentFragment();
+  for (const l of logLines) {
+    if (l.cls === "gp" && !showGp) continue;
+    if (l.cls === "pad" && !showPad) continue;
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = l.stamp + "  ";
+    const s = document.createElement("span");
+    if (l.cls) s.className = l.cls;
+    s.textContent = l.text + "\n";
+    frag.appendChild(t);
+    frag.appendChild(s);
+  }
+  el.replaceChildren(frag);
+  if ($("chkScroll").checked) el.scrollTop = el.scrollHeight;
+}
+
+function systemLog(text, cls = "ev") {
+  const now = new Date();
+  const stamp = now.toTimeString().slice(0, 8) + "." + String(now.getMilliseconds()).padStart(3, "0");
+  savedLines.push(stamp + "  [網頁] " + text);
+  addLog(stamp, "[網頁] " + text, cls);
+}
+
+// ===== Web Serial =====
+async function connect() {
+  if (!("serial" in navigator)) return;
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+  } catch (e) {
+    systemLog("連接失敗：" + e.message + "（如果 Arduino IDE 的序列埠監控視窗開著，請先關掉）", "err");
+    port = null;
+    return;
+  }
+  stopDemo();
+  // 放開 DTR／RTS，避免 ESP32 卡在下載模式或重開機狀態
+  try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (e) {}
+  setConn("on", "已連接");
+  systemLog("已連接序列埠（115200）");
+  lastGpAt = performance.now();
+  keepReading = true;
+  readLoop();
+}
+
+async function readLoop() {
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (port && port.readable && keepReading) {
+    reader = port.readable.getReader();
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          onLine(buf.slice(0, nl));
+          buf = buf.slice(nl + 1);
+        }
+        if (buf.length > 4096) buf = buf.slice(-1024);
+      }
+    } catch (e) {
+      systemLog("讀取中斷：" + e.message + "（USB 線被拔掉？）", "err");
+      break;
+    } finally {
+      reader.releaseLock();
+      reader = null;
+    }
+  }
+  await closePort();
+}
+
+async function closePort() {
+  keepReading = false;
+  if (reader) { try { await reader.cancel(); } catch (e) {} }
+  if (port) { try { await port.close(); } catch (e) {} }
+  port = null;
+  if (!demoTimer) setConn("off", "未連接");
+}
+
+async function resetEsp() {
+  if (!port) return;
+  // DevKit 自動重開機電路：RTS 拉起 → EN 拉低；DTR 要放開，否則會進下載模式
+  try {
+    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await new Promise((r) => setTimeout(r, 150));
+    await port.setSignals({ requestToSend: false });
+    prev = null;
+    systemLog("已送出重開機訊號（RTS）");
+  } catch (e) {
+    systemLog("重開機失敗：" + e.message, "err");
+  }
+}
+
+function setConn(kind, text) {
+  $("connDot").className = "dot" + (kind === "on" ? " on" : kind === "demo" ? " demo" : "");
+  $("connText").textContent = text;
+  const connected = kind === "on";
+  $("btnConnect").disabled = connected || !("serial" in navigator);
+  $("btnDisconnect").disabled = !connected;
+  $("btnReset").disabled = !connected;
+  $("btnDemo").textContent = kind === "demo" ? "停止示範" : "示範模式";
+  $("btnDemo").disabled = connected;
+}
+
+// ===== 示範模式：模擬 car_main 送出的 GP 行，不需要 ESP32 =====
+const demoScript = [
+  // [持續 ms, 內容]
+  [1500, { jl: 0, jr: 0 }],
+  [1200, { jl: 0, jr: 1 }],
+  [1000, { jl: 0, jr: 2, log: "[gamepad] 右 Joy-Con 搖桿歸零完成：油門中心 0、轉向中心 55" }],
+  [800, { jl: 1, jr: 2 }],
+  [1500, { jl: 2, jr: 2, log: "[gamepad] 左 Joy-Con 搖桿歸零完成：油門中心 19、轉向中心 0" }],
+  [2000, { T: 420 }],
+  [800, {}],
+  [2000, { T: -380 }],
+  [800, {}],
+  [2000, { S: 400 }],
+  [800, {}],
+  [2000, { S: -400 }],
+  [800, {}],
+  [2200, { T: 400, S: 180 }],
+  [800, {}],
+  [2200, { T: 480, zr: 1 }],
+  [800, {}],
+  [1800, { T: 300, dc: 12 }],
+  [800, {}],
+  [400, { plus: 1, mode: "AUTO" }],
+  [2500, { mode: "AUTO", auto: "CRUISE", cl: 50, cr: 50 }],
+  [1500, { mode: "AUTO", auto: "TURN", dc: 25, cl: 45, cr: -45 }],
+  [400, { plus: 1 }],
+  [700, { a: 1 }],
+  [500, { b: 1 }],
+  [1500, { jr: 0, log: "[gamepad] 右 Joy-Con 斷線" }],
+];
+
+function startDemo() {
+  if (port) return;
+  setConn("demo", "示範模式（假資料）");
+  systemLog("示範模式開始：以下是模擬資料，不是真的 ESP32");
+  let step = 0;
+  let stepStart = performance.now();
+  let lastLogged = -1;
+  let mode = "MAN";
+  demoTimer = setInterval(() => {
+    const now = performance.now();
+    if (now - stepStart > demoScript[step][0]) {
+      step = (step + 1) % demoScript.length;
+      stepStart = now;
+    }
+    const s = demoScript[step][1];
+    if (s.log && lastLogged !== step) { onLine(s.log); lastLogged = step; }
+    if (step === 0) { lastLogged = -1; }
+    if (s.mode) mode = s.mode;
+    if (step === 0) mode = "MAN";
+    const jl = s.jl ?? 2, jr = s.jr ?? 2;
+    const pad = jl === 2 && jr === 2 ? 1 : 0;
+    const noise = () => 0;
+    let T = pad ? (s.T ?? 0) + noise() : 0;
+    let S = pad ? (s.S ?? 0) + noise() : 0;
+    const zr = s.zr ?? 0;
+    const dc = s.dc ?? 300;
+    let cl = 0, cr = 0;
+    if (pad && mode === "MAN") {
+      const limit = zr ? 100 : 60;
+      let t = Math.trunc(T * 100 / 512);
+      const st = Math.trunc(S * 100 / 512);
+      if (dc < 15 && t > 0) t = 0;
+      cl = Math.trunc(Math.max(-100, Math.min(100, t + st)) * limit / 100);
+      cr = Math.trunc(Math.max(-100, Math.min(100, t - st)) * limit / 100);
+    } else if (pad) {
+      cl = s.cl ?? 0; cr = s.cr ?? 0;
+    }
+    if (!pad) mode = "MAN";
+    const line = `GP pad=${pad} jl=${jl} jr=${jr} pro=0 mode=${mode} auto=${s.auto ?? "CRUISE"} T=${T} S=${S} zr=${zr} ` +
+      `a=${s.a ?? 0} b=${s.b ?? 0} plus=${s.plus ?? 0} cl=${cl} cr=${cr} ol=0 or=0 dl=300 dc=${dc} dr=300 bat=0.43 low=1 crit=1`;
+    onLine(line);
+  }, 100);
+}
+
+function stopDemo() {
+  if (!demoTimer) return;
+  clearInterval(demoTimer);
+  demoTimer = null;
+  prev = null;
+  systemLog("示範模式結束");
+  if (!port) setConn("off", "未連接");
+}
+
+// ===== 資料更新率與逾時 =====
+setInterval(() => {
+  const now = performance.now();
+  const secs = (now - gpCountWindowStart) / 1000;
+  if (secs >= 1) {
+    $("rate").textContent = (port || demoTimer) ? `GP 資料 ${(gpCount / secs).toFixed(1)} 行／秒` : "";
+    gpCount = 0;
+    gpCountWindowStart = now;
+  }
+  if (port && now - lastGpAt > STREAM_TIMEOUT_MS) {
+    $("noStream").classList.remove("hidden");
+  }
+}, 250);
+
+// ===== 按鈕 =====
+$("btnConnect").onclick = connect;
+$("btnDisconnect").onclick = async () => { keepReading = false; await closePort(); systemLog("已中斷連接"); };
+$("btnReset").onclick = resetEsp;
+$("btnDemo").onclick = () => (demoTimer ? stopDemo() : startDemo());
+$("btnPause").onclick = () => {
+  paused = !paused;
+  $("btnPause").textContent = paused ? "繼續" : "暫停";
+  if (!paused) renderLog();
+};
+$("btnClear").onclick = () => { logLines.length = 0; renderLog(); };
+$("btnSave").onclick = () => {
+  const blob = new Blob([savedLines.join("\n") + "\n"], { type: "text/plain" });
+  const a = document.createElement("a");
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  a.href = URL.createObjectURL(blob);
+  a.download = `gamepad_log_${ts}.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+for (const id of ["chkGp", "chkPad"]) $(id).onchange = renderLog;
+
+if ("serial" in navigator) {
+  navigator.serial.addEventListener("disconnect", (e) => {
+    if (port && e.target === port) { systemLog("ESP32 的 USB 被拔掉了", "err"); closePort(); }
+  });
+} else {
+  $("noSerial").classList.remove("hidden");
+}
+
+setupDeadzones();
+setConn("off", "未連接");
+</script>
+</body>
+</html>

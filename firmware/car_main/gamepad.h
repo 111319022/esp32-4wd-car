@@ -10,7 +10,14 @@ struct GamepadState {
   bool modeTogglePressed = false;  // 「＋」剛按下（只在按下那一次為 true）
   bool hornHeld = false;           // A：喇叭（選配）
   bool lightTogglePressed = false; // B 剛按下：車燈開關（選配）
+  bool plusHeld = false;           // 「＋」按住中（給除錯輸出用）
+  bool lightHeld = false;          // B 按住中（給除錯輸出用）
 };
+
+// 個別手把的狀態（給除錯輸出用）
+enum GamepadSlotStatus { PAD_ABSENT = 0, PAD_CALIBRATING = 1, PAD_READY = 2 };
+enum GamepadSlotId { PAD_SLOT_LEFT = 0, PAD_SLOT_RIGHT = 1, PAD_SLOT_PRO = 2 };
+GamepadSlotStatus gamepadSlotStatus(GamepadSlotId slot);
 
 void gamepadBegin();
 
