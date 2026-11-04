@@ -10,9 +10,18 @@
 //   - Joy-Con 直握：右 Joy-Con 搖桿往右推時，axisY 是不是正值（程式假設是）
 //   - 右 Joy-Con 上印的 A、B 鍵，各自讓 a/b/x/y 哪一個變成 1（程式假設 A → a、B → x）
 //   - 右 Joy-Con 按 ZR 時 r2 會不會變成 1；按「＋」時 misc 會不會出現 0x04
-//   - 按住該支手把的 a 鍵時會不會震動（Bluepad32 4.1.0 的 Joy-Con 可能不會震）
+//   - 按住該支手把的 a 鍵時會不會震動
+//     Joy-Con 連上時會補送「開啟震動」指令（esp32_bluepad32 4.1.0 沒送），做法與 car_main/gamepad.cpp 相同
+//     ENABLE_JOYCON_VIBRATION 改成 0 可以比較補送前後的差別
 
 #include <Bluepad32.h>
+
+extern "C" {
+#include <btstack_run_loop.h>
+#include <uni_hid_device.h>
+}
+
+#define ENABLE_JOYCON_VIBRATION 1
 
 constexpr int MAX_PADS = 2;
 ControllerPtr pads[MAX_PADS] = {nullptr, nullptr};
@@ -30,10 +39,49 @@ const char* modelName(int model) {
   }
 }
 
+// ===== 補送 Joy-Con「開啟震動」指令（說明見 car_main/gamepad.cpp）=====
+struct VibrationEnableJob {
+  btstack_context_callback_registration_t registration;
+  uint8_t btaddr[6];
+  volatile bool pending;
+};
+VibrationEnableJob vibrationJobs[MAX_PADS];
+
+void sendVibrationEnableOnBtThread(void* context) {
+  VibrationEnableJob* job = static_cast<VibrationEnableJob*>(context);
+  uni_hid_device_t* d = uni_hid_device_get_instance_for_address(job->btaddr);
+  if (d != nullptr) {
+    static uint8_t packetNum = 0;
+    uint8_t report[] = {0xA2, 0x01, packetNum, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x48, 0x01};
+    packetNum = (packetNum + 1) & 0x0F;
+    uni_hid_device_send_intr_report(d, report, sizeof(report));
+  }
+  job->pending = false;
+}
+
+void enableJoyConVibration(ControllerPtr ctl, int slot) {
+  VibrationEnableJob& job = vibrationJobs[slot];
+  if (job.pending) return;
+  ControllerProperties props = ctl->getProperties();
+  memcpy(job.btaddr, props.btaddr, sizeof(job.btaddr));
+  job.registration = {};
+  job.registration.callback = &sendVibrationEnableOnBtThread;
+  job.registration.context = &job;
+  job.pending = true;
+  btstack_run_loop_execute_on_main_thread(&job.registration);
+  Serial.printf("[%d] 已補送 Joy-Con 開啟震動指令\n", slot);
+}
+
 void onConnected(ControllerPtr ctl) {
   for (int i = 0; i < MAX_PADS; i++) {
     if (pads[i] == nullptr) {
       pads[i] = ctl;
+#if ENABLE_JOYCON_VIBRATION
+      int model = ctl->getModel();
+      if (model == Controller::CONTROLLER_TYPE_SwitchJoyConLeft || model == Controller::CONTROLLER_TYPE_SwitchJoyConRight) {
+        enableJoyConVibration(ctl, i);
+      }
+#endif
       Serial.printf("[%d] 已連線：%s（model=%d, %s）\n", i, modelName(ctl->getModel()), ctl->getModel(),
                     ctl->getModelName().c_str());
       return;

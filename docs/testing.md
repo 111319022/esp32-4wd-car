@@ -41,7 +41,8 @@
 | 右 Joy-Con 上印的 B 鍵 → | 待測（預期 x()） |
 | 右 ZR → | 待測（預期 r2()） |
 | 右 Joy-Con「＋」的 misc 值 | 待測（預期 0x04） |
-| Joy-Con 震動 | 待測（4.1.0 可能不會震） |
+| Joy-Con 震動（補送開啟震動指令後） | 待測 |
+| Joy-Con 震動（`ENABLE_JOYCON_VIBRATION` 設 0 對照） | 待測（預期不會震） |
 | 關掉其中一支 Joy-Con，車子停下 | 待測 |
 | （備用）Pro 手把：左搖桿往上推，axisY 是 | 待測 |
 | （備用）Pro 手把：A／B、ZR、震動 | 待測 |

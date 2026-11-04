@@ -50,7 +50,15 @@ Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都�
 
 ⚠️ 上表是依 esp32_bluepad32 4.1.0 的原始碼推得，**還沒實測**，請用 `test_gamepad` 確認後更新。
 
-⚠️ **4.1.0 沒有啟用 Joy-Con 的震動**（Bluepad32 5.0 才修正），Joy-Con 很可能不會震，防撞輔助與低電量就沒有震動提醒。實測確認後可考慮打開蜂鳴器（`FEATURE_BUZZER`）代替。
+**Joy-Con 震動**：Joy-Con 要先收到子指令 `0x48`（開啟震動）才會震，esp32_bluepad32 4.1.0 初始化時沒有送（Bluepad32 5.0 才補上）。`gamepad.cpp` 的 `enableJoyConVibration()` 會在 Joy-Con 連上時補送一次：
+
+- 用 Bluepad32 內部的 `uni_hid_device_get_instance_for_address()` 找到裝置，`uni_hid_device_send_intr_report()` 送出。
+- 藍牙函式只能在 BTstack 執行緒呼叫，所以透過 `btstack_run_loop_execute_on_main_thread()` 轉交。
+- 只能在手把初始化完成後送（4.1.0 初始化期間收到任何子指令回覆都會跳到下一步）；`onConnected()` 是在初始化完成後才呼叫，所以時機是安全的。
+- 序列埠可能會出現 Bluepad32 的「unexpected subcmd_id=0x48」訊息，這是它不認得這個回覆，無害。
+- 換成 Bluepad32 5.0 以上的開發板套件後可以拿掉這段。
+
+⚠️ 尚未實測。如果 Joy-Con 還是不震，可以打開蜂鳴器（`FEATURE_BUZZER`）代替。
 
 ### Pro 手把（備用）
 

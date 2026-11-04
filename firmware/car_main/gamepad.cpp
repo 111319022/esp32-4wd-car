@@ -5,6 +5,12 @@
 
 #include "config.h"
 
+// Bluepad32 內部介面（C 語言），只用來補送 Joy-Con 的「開啟震動」指令，見 enableJoyConVibration()
+extern "C" {
+#include <btstack_run_loop.h>
+#include <uni_hid_device.h>
+}
+
 // 手把組合（擇一）：
 //   1. 左右兩支 Joy-Con（主要設計）：左 Joy-Con 搖桿上下 = 油門，右 Joy-Con 搖桿左右 = 轉向
 //   2. 一支 Switch Pro 手把（備用）：左搖桿上下 = 油門，右搖桿左右 = 轉向
@@ -26,15 +32,56 @@ bool isUsable(ControllerPtr ctl) {
   return ctl && ctl->isConnected() && ctl->isGamepad();
 }
 
+// ===== 補送 Joy-Con「開啟震動」指令 =====
+// Joy-Con 要先收到子指令 0x48（enable vibration）才會理會震動訊號。esp32_bluepad32 4.1.0
+// 初始化時沒有送（Bluepad32 5.0 才補上），所以 Joy-Con 連上後由我們補送一次。
+// - 必須在手把初始化完成後才送：4.1.0 初始化期間收到任何子指令回覆都會跳到下一步。
+//   onConnected() 是在 Bluepad32 完成初始化（STATE_READY）之後才被呼叫，所以在這裡送是安全的。
+// - 藍牙相關函式只能在 BTstack 的執行緒呼叫，所以用 btstack_run_loop_execute_on_main_thread() 轉交。
+// - 換成 Bluepad32 5.0 以上的開發板套件後，這段就不需要了（重送一次也無害）。
+struct VibrationEnableJob {
+  btstack_context_callback_registration_t registration;
+  uint8_t btaddr[6];
+  volatile bool pending;
+};
+VibrationEnableJob vibrationJobs[2];  // [0] 左 Joy-Con、[1] 右 Joy-Con
+
+void sendVibrationEnableOnBtThread(void* context) {
+  VibrationEnableJob* job = static_cast<VibrationEnableJob*>(context);
+  uni_hid_device_t* d = uni_hid_device_get_instance_for_address(job->btaddr);
+  if (d != nullptr) {
+    static uint8_t packetNum = 0;
+    // 0xA2：HID DATA | OUTPUT；0x01：子指令報告；接著 8 bytes 中性震動資料；0x48 0x01：開啟震動
+    uint8_t report[] = {0xA2, 0x01, packetNum, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x48, 0x01};
+    packetNum = (packetNum + 1) & 0x0F;
+    uni_hid_device_send_intr_report(d, report, sizeof(report));
+  }
+  job->pending = false;
+}
+
+void enableJoyConVibration(ControllerPtr ctl, int slot) {
+  VibrationEnableJob& job = vibrationJobs[slot];
+  if (job.pending) return;  // 上一次還沒送出，不能重複登記同一個 registration
+  ControllerProperties props = ctl->getProperties();
+  memcpy(job.btaddr, props.btaddr, sizeof(job.btaddr));
+  job.registration = {};
+  job.registration.callback = &sendVibrationEnableOnBtThread;
+  job.registration.context = &job;
+  job.pending = true;
+  btstack_run_loop_execute_on_main_thread(&job.registration);
+}
+
 void onConnected(ControllerPtr ctl) {
   int model = ctl->getModel();
   bool usingJoyCon = joyLeft || joyRight;
 
   if (model == Controller::CONTROLLER_TYPE_SwitchJoyConLeft && !joyLeft && !pro) {
     joyLeft = ctl;
+    enableJoyConVibration(ctl, 0);
     Serial.println("[gamepad] 左 Joy-Con 已連線");
   } else if (model == Controller::CONTROLLER_TYPE_SwitchJoyConRight && !joyRight && !pro) {
     joyRight = ctl;
+    enableJoyConVibration(ctl, 1);
     Serial.println("[gamepad] 右 Joy-Con 已連線");
   } else if (model == Controller::CONTROLLER_TYPE_SwitchProController && !pro && !usingJoyCon) {
     pro = ctl;
@@ -144,8 +191,7 @@ void gamepadRumble(int durationMs) {
   unsigned long now = millis();
   if (now - lastRumbleMs < RUMBLE_COOLDOWN_MS) return;
   lastRumbleMs = now;
-  // 注意：esp32_bluepad32 4.1.0 沒有啟用 Joy-Con 的震動馬達（Bluepad32 5.0 才修正），
-  // Joy-Con 可能完全不會震；Pro 手把正常
+  // Joy-Con 要先送過「開啟震動」指令才會震（連線時已由 enableJoyConVibration() 補送）
   rumbleOne(pro, durationMs);
   rumbleOne(joyLeft, durationMs);
   rumbleOne(joyRight, durationMs);
