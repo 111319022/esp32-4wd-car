@@ -55,7 +55,11 @@ constexpr float RIGHT_TRIM = 1.0f;
 // ===== 手動模式 =====
 constexpr int SPEED_LIMIT_NORMAL_PCT = 60;  // 平常的速度上限
 constexpr int SPEED_LIMIT_BOOST_PCT = 100;  // 按住 ZR 時的速度上限
-constexpr int STICK_DEADZONE = 40;          // 搖桿死區（滿刻度約 512）
+constexpr int STICK_DEADZONE = 40;          // 搖桿死區（滿刻度約 512，套用在歸零之後）
+// 連線時自動歸零：手把連上後取這段時間的平均當中心點，歸零完成前車子不會動
+constexpr unsigned long STICK_CENTER_SAMPLE_MS = 500;
+constexpr int STICK_CENTER_MAX_SPREAD = 40;   // 取樣期間變化超過這個值 → 判定搖桿在動，重新取樣
+constexpr int STICK_CENTER_MAX_OFFSET = 150;  // 中心偏超過這個值 → 判定有人推著搖桿，重新取樣（實測右 Joy-Con 約 +60）
 // 雙 Joy-Con：左 Joy-Con 往上推應該前進、右 Joy-Con 往右推應該右轉，相反就改成 true
 constexpr bool JOYCON_THROTTLE_INVERTED = false;
 constexpr bool JOYCON_STEER_INVERTED = false;

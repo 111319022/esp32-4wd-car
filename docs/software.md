@@ -46,9 +46,16 @@ Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都�
 | 右 Joy-Con 的 A | 喇叭（選配） | `joyRight->a()` |
 | 右 Joy-Con 的 B | 車燈開關（選配） | `joyRight->x()` |
 
-方向相反時改 `config.h` 的 `JOYCON_THROTTLE_INVERTED`／`JOYCON_STEER_INVERTED`。
+方向相反時改 `config.h` 的 `JOYCON_THROTTLE_INVERTED`／`JOYCON_STEER_INVERTED`（2026-11-04 實測方向正確，維持 false）。
 
-⚠️ 上表是依 esp32_bluepad32 4.1.0 的原始碼推得，**還沒實測**，請用 `test_gamepad` 確認後更新。
+**連線時自動歸零**：實測右 Joy-Con 放開搖桿時轉向讀值停在約 +60，超過死區，車子會自己偏（4.1.0 讀右 Joy-Con 校正資料有誤，4.2.0 才修正）。所以每支手把連上後，`gamepad.cpp` 先取 `STICK_CENTER_SAMPLE_MS`（500 ms）的平均當中心點：
+
+- 歸零完成前這支手把不算可用，`connected = false`，車子不會動。
+- 取樣期間變化超過 `STICK_CENTER_MAX_SPREAD`，或中心偏超過 `STICK_CENTER_MAX_OFFSET`，判定有人在推搖桿，序列埠印「歸零失敗：請放開搖桿」並重新取樣。
+- 之後的讀值扣掉中心點，兩側再各自拉回 ±512 的滿刻度，最後才套死區 `STICK_DEADZONE`。
+- **連線時不要碰搖桿。** Pro 手把也一樣會歸零。
+
+上表已在 2026-11-04 用 `test_gamepad` 實測確認（見 `docs/testing.md`）。
 
 **Joy-Con 震動**：Joy-Con 要先收到子指令 `0x48`（開啟震動）才會震，esp32_bluepad32 4.1.0 初始化時沒有送（Bluepad32 5.0 才補上）。`gamepad.cpp` 的 `enableJoyConVibration()` 會在 Joy-Con 連上時補送一次：
 
@@ -58,7 +65,7 @@ Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都�
 - 序列埠可能會出現 Bluepad32 的「unexpected subcmd_id=0x48」訊息，這是它不認得這個回覆，無害。
 - 換成 Bluepad32 5.0 以上的開發板套件後可以拿掉這段。
 
-⚠️ 尚未實測。如果 Joy-Con 還是不震，可以打開蜂鳴器（`FEATURE_BUZZER`）代替。
+2026-11-04 實測：補送後 Joy-Con 會震。
 
 ### Pro 手把（備用）
 

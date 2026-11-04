@@ -16,7 +16,7 @@
 | 項目 | 選定 | 關鍵限制 |
 |---|---|---|
 | 主控 | ESP32-WROOM-32 DevKit V1（原版 ESP32） | Switch 手把用傳統藍牙，**不可換成 ESP32-S3/C3/C6**（只有 BLE） |
-| 手把 | 左右兩支 Joy-Con（備用：一支 Pro 手把），函式庫 Bluepad32 | 兩支 Joy-Con 都連上才能開，任何一支斷線就停車；4.1.0 不會開 Joy-Con 震動，由 `gamepad.cpp` 補送 0x48 指令（待實測） |
+| 手把 | 左右兩支 Joy-Con（備用：一支 Pro 手把），函式庫 Bluepad32 | 兩支 Joy-Con 都連上才能開，任何一支斷線就停車；4.1.0 不會開 Joy-Con 震動，由 `gamepad.cpp` 補送 0x48 指令（實測會震）；右 Joy-Con 中心偏約 +60，連線時自動歸零（連線時別碰搖桿） |
 | 馬達驅動 | 傳統 L298N 模組（黑色散熱片、板載 5V 穩壓） | 約 2 V 壓降；12V 跳線帽保留、ENA/ENB 跳線帽拔掉 |
 | 馬達 | TT 減速馬達 ×4（底盤套件附） | 左側兩顆並聯接 A 通道、右側兩顆接 B 通道（坦克式轉向） |
 | 感測 | HC-SR04 ×3，車頭扇形：左前 −30°、正前 0°、右前 +30° | Echo 輸出 5 V，**必須 1kΩ + 2kΩ 分壓**；三顆輪流觸發避免干擾 |
@@ -133,7 +133,7 @@ firmware/
 - [x] 安裝開發環境，`car_main` 成功編譯（2026-11-04，esp32_bluepad32 4.1.0；test_gamepad 也通過編譯）
 - [ ] 通電檢查：L298N 5V 端子量到約 5 V
 - [ ] test_motors：確認四顆馬達方向，必要時設定 `*_MOTOR_INVERTED`
-- [ ] test_gamepad：確認兩支 Joy-Con 的 model、搖桿方向、A/B 對應、ZR、「＋」、震動（補送 0x48 後是否會震）
+- [x] test_gamepad：兩支 Joy-Con 的 model、搖桿方向、A/B 對應、ZR、「＋」、震動都確認（2026-11-04，結果見 docs/testing.md）
 - [ ] test_sonar：10／30／50／100 cm 校正
 - [ ] test_battery：與三用電表比對
 - [ ] 整合測試：手動模式、防撞輔助、自動避障、斷線保護

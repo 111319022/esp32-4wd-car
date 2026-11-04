@@ -98,9 +98,10 @@ void loop() {
   unsigned long now = millis();
   if (now - lastDebugMs >= 200) {
     lastDebugMs = now;
-    Serial.printf("pad=%d mode=%s auto=%s | L=%3d C=%3d R=%3d cm | out L=%4d R=%4d %% | bat=%.2fV\n",
-                  gp.connected, mode == DriveMode::AUTO ? "AUTO" : "MAN", autopilotStateName(), leftCm, centerCm,
-                  rightCm, leftPct, rightPct, batteryVolts());
+    // T／S 是歸零、死區之後的搖桿值（-512～512），只插 USB 時電池保護會讓 out 一直是 0，看 T／S 就好
+    Serial.printf("pad=%d mode=%s auto=%s | T=%4d S=%4d%s | L=%3d C=%3d R=%3d cm | out L=%4d R=%4d %% | bat=%.2fV\n",
+                  gp.connected, mode == DriveMode::AUTO ? "AUTO" : "MAN", autopilotStateName(), gp.throttle,
+                  gp.steer, gp.boost ? " ZR" : "", leftCm, centerCm, rightCm, leftPct, rightPct, batteryVolts());
   }
 #endif
 
