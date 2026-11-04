@@ -28,6 +28,38 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
                               18650 ×2 串聯（7.4 V）─┘
 ```
 
+## 目前進度（2026-11-04）
+
+| 項目 | 狀態 |
+|---|---|
+| 規劃、材料清單、接線設計 | ✅ 完成（期中報告） |
+| 韌體 `car_main` | ✅ 可編譯、已燒錄到 ESP32 |
+| 手把：雙 Joy-Con 連線、按鍵對應、震動、搖桿歸零 | ✅ 已實測 |
+| 手把監看網頁 | ✅ 完成 |
+| 材料採購、組裝底盤 | 進行中 |
+| 馬達、超音波、電池實測與整合測試 | 待材料到齊 |
+
+詳細測試結果見 [`docs/testing.md`](docs/testing.md)。
+
+## 程式碼導覽
+
+韌體是 Arduino sketch，每個功能一個模組，參數全部集中在 `config.h`。主迴圈不會長時間阻塞，需要計時的動作都用 `millis()` 寫成狀態機。
+
+| 檔案 | 內容 | 建議先看 |
+|---|---|---|
+| [`firmware/car_main/car_main.ino`](firmware/car_main/car_main.ino) | 主迴圈：讀手把 → 測距 → 讀電池 → 依模式算左右輪速度 → 輸出；手動混控、防撞輔助、斷線保護 | ⭐ |
+| [`firmware/car_main/config.h`](firmware/car_main/config.h) | 腳位、功能開關、所有可調參數 | ⭐ |
+| [`firmware/car_main/gamepad.cpp`](firmware/car_main/gamepad.cpp) | 合併左右兩支 Joy-Con、搖桿歸零、補送 Joy-Con 震動指令 | ⭐ |
+| [`firmware/car_main/autopilot.cpp`](firmware/car_main/autopilot.cpp) | 自動避障狀態機（直行／後退／轉向） | ⭐ |
+| [`firmware/car_main/motors.cpp`](firmware/car_main/motors.cpp) | L298N 坦克式驅動、PWM | |
+| [`firmware/car_main/sonar.cpp`](firmware/car_main/sonar.cpp) | 三顆 HC-SR04 輪流測距 | |
+| [`firmware/car_main/battery.cpp`](firmware/car_main/battery.cpp) | 電池電壓監測、低電壓停車鎖定 | |
+| [`firmware/car_main/extras.cpp`](firmware/car_main/extras.cpp) | 選配車燈、喇叭 | |
+| [`firmware/tests/`](firmware/tests/) | 單項測試程式：馬達、手把、超音波、電池 | |
+| [`tools/gamepad_monitor.html`](tools/gamepad_monitor.html) | 測試用網頁：用 Web Serial 讀 ESP32，即時顯示手把與判讀結果 | |
+
+控制邏輯與設計理由分別見 [`docs/software.md`](docs/software.md) 與 [`docs/decisions.md`](docs/decisions.md)。
+
 ## 快速開始
 
 1. 照 [`docs/setup.md`](docs/setup.md) 安裝 Arduino IDE 和 Bluepad32 開發板套件。
@@ -46,13 +78,11 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
 | [`docs/setup.md`](docs/setup.md) | 開發環境安裝與燒錄 |
 | [`docs/testing.md`](docs/testing.md) | 測試步驟、驗收標準、測試紀錄 |
 | [`docs/decisions.md`](docs/decisions.md) | 設計決策紀錄 |
-| [`CLAUDE.md`](CLAUDE.md) | 專案記憶：給 AI 代理與組員快速掌握全貌 |
 
 ## 用 AI 代理協作
 
-- **Claude Code**：在 repo 根目錄開啟就會自動讀取 `CLAUDE.md`。
-- **其他代理**（Codex、Cursor 等）：會讀 `AGENTS.md`，再導向 `CLAUDE.md`。
-- 有新的決定、腳位變更或測試結果時，請更新 `CLAUDE.md` 與對應的 `docs/` 文件，讓下一個人（或下一個 AI）接得上。
+- AI 代理（Codex、Cursor 等）會讀 [`AGENTS.md`](AGENTS.md)，裡面有本專案的規則。
+- 有新的決定、腳位變更或測試結果時，請更新對應的 `docs/` 文件，讓下一個人（或下一個 AI）接得上。
 
 ## 協作方式
 

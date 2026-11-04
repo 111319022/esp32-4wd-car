@@ -1,16 +1,16 @@
 # 韌體架構與控制邏輯
 
-> 狀態：程式骨架已完成，**尚未在實機上編譯與測試**。Bluepad32 的 API 是對照官方範例寫的；第一次編譯若有錯誤，以實際錯誤訊息修正後更新本文件。
+> 狀態（2026-11-04）：`car_main` 已用 esp32_bluepad32 4.1.0 編譯並燒錄到 ESP32。手把部分（雙 Joy-Con 連線、按鍵對應、震動、搖桿歸零）已實測通過；馬達、超音波、電池還沒接線，相關邏輯尚未實測。
 
 ## 模組
 
 | 檔案 | 負責 | 對外函式 |
 |---|---|---|
-| `car_main.ino` | setup／loop、模式切換、手動混控、防撞輔助、電池保護 | — |
+| `car_main.ino` | setup／loop、模式切換、手動混控、防撞輔助、電池保護、除錯輸出 | — |
 | `config.h` | 腳位、功能開關、所有可調參數 | — |
 | `motors.*` | L298N 坦克式驅動 | `motorsBegin`、`motorsSet`、`motorsSetPercent`、`motorsStop` |
 | `sonar.*` | 三顆 HC-SR04 輪流測距 | `sonarBegin`、`sonarUpdate`、`sonarCm` |
-| `gamepad.*` | Bluepad32 手把（左右兩支 Joy-Con，或一支 Pro 手把當備用） | `gamepadBegin`、`gamepadUpdate`、`gamepadState`、`gamepadRumble` |
+| `gamepad.*` | Bluepad32 手把：合併左右兩支 Joy-Con（或一支 Pro 手把當備用）、搖桿歸零、補送 Joy-Con 震動指令 | `gamepadBegin`、`gamepadUpdate`、`gamepadState`、`gamepadRumble`、`gamepadSlotStatus` |
 | `autopilot.*` | 自動避障狀態機 | `autopilotReset`、`autopilotStep`、`autopilotStateName` |
 | `battery.*` | 電池電壓監測 | `batteryBegin`、`batteryUpdate`、`batteryVolts`、`batteryLow`、`batteryCritical` |
 | `extras.*` | 選配車燈、喇叭 | `extrasBegin`、`extrasUpdate`、`extrasOff` |
@@ -96,7 +96,7 @@ Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都�
 右輪 = T − S
 ```
 
-結果限制在 −100～100%，再乘上速度上限（平常 60%，按住 ZR 100%）。搖桿有死區 `STICK_DEADZONE`，避免放開搖桿時車子緩慢飄移。
+T、S 是歸零、死區之後的搖桿值（−512～512），先換算成 −100～100%，混控結果限制在 −100～100%，再乘上速度上限（平常 60%，按住 ZR 100%）。連線時的自動歸零加上死區 `STICK_DEADZONE`，避免放開搖桿時車子緩慢飄移。
 
 ### 防撞輔助（手動模式）
 
@@ -130,7 +130,7 @@ TURN 回到 CRUISE 的條件是正前 > `AUTO_FRONT_CM + AUTO_CLEAR_MARGIN_CM`�
 
 | 情況 | 行為 |
 |---|---|
-| 手把斷線（雙 Joy-Con 時任何一支） | 立刻停車、關閉車燈喇叭、回到手動模式 |
+| 手把斷線（雙 Joy-Con 時任何一支），或搖桿還在歸零 | 立刻停車、關閉車燈喇叭、回到手動模式 |
 | 電池 < `BATTERY_LOW_V`（7.0 V） | 手把震動提醒 |
 | 電池 < `BATTERY_CRITICAL_V`（6.6 V） | 強制停車並震動 |
 | 電池連續 < 6.6 V 達 `BATTERY_CRITICAL_HOLD_MS`（3 秒） | **鎖定停車**，重開機才解除 |
@@ -173,7 +173,8 @@ GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=0 zr=0 a=0 b=0 plus=0 cl=0 c
 | 某一側前後相反 | `LEFT_MOTOR_INVERTED`／`RIGHT_MOTOR_INVERTED` 改 true |
 | 車子走不直 | 較快那側的 `*_TRIM` 調小（例如 0.95） |
 | 低速時馬達只嗡嗡叫不轉 | `MOTOR_MIN_PWM` 調大 |
-| 放開搖桿車子還會動 | `STICK_DEADZONE` 調大 |
+| 放開搖桿車子還會動 | 先確認連線時沒碰搖桿（看監看網頁或序列埠的歸零中心）；仍會動再把 `STICK_DEADZONE` 調大 |
+| 一直「歸零失敗」 | 手把放桌上別碰；仍失敗就把 `STICK_CENTER_MAX_SPREAD` 調大 |
 | 防撞煞車太晚撞到牆 | `ASSIST_STOP_CM` 調大，或 `SPEED_LIMIT_NORMAL_PCT` 調小 |
 | 自動模式太早轉彎、在空曠處也一直轉 | `AUTO_FRONT_CM` 調小 |
 | 自動模式原地轉不動 | `AUTO_TURN_PCT` 調大 |
@@ -181,8 +182,9 @@ GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=0 zr=0 a=0 b=0 plus=0 cl=0 c
 
 ## 待辦
 
-- [ ] 第一次在 Arduino IDE 編譯 `car_main`，修正編譯錯誤
-- [ ] 用 `test_gamepad` 確認 A/B、ZR、「＋」的實際對應，更新上方「手把對應」
+- [x] 第一次編譯 `car_main`（2026-11-04，無錯誤）
+- [x] 用 `test_gamepad` 確認雙 Joy-Con 的 A/B、ZR、「＋」、搖桿方向與震動（2026-11-04）
+- [ ] 用 `test_gamepad` 確認備用 Pro 手把的 A/B 對應
 - [ ] 超音波加中位數濾波（取最近 3 次的中位數），減少偶發的錯誤讀值
 - [ ] 自動模式加「手動接管」：自動模式中推搖桿就暫時改為手動
 - [ ] （選配）啟用車燈、喇叭並實測
