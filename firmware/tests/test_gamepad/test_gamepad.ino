@@ -1,15 +1,17 @@
-// test_gamepad — Switch 手把連線測試（需要 esp32_bluepad32 開發板套件）
+// test_gamepad — 手把連線測試（需要 esp32_bluepad32 開發板套件）
 //
 // 1. 上傳後打開序列埠監控視窗（115200）
-// 2. 左右兩支 Joy-Con 各自按住側邊滑軌上的同步鍵（也可以測一支 Pro 手把：按住頂部的小同步鍵）
+// 2. 讓要測的手把進入配對模式（Joy-Con：按住側邊滑軌上的同步鍵；Pro 手把：按住頂部的小同步鍵；
+//    Xbox／PS 見 docs/setup.md）。car_main 一次只用一支手把，這支測試程式最多同時接兩支方便比較
 // 3. 連上後每支手把一行，印出種類與搖桿、按鍵狀態
 //
 // 要確認的事（結果請記到 docs/testing.md）：
 //   - 連線時印出的 model：左 Joy-Con 應為 39、右 Joy-Con 應為 40、Pro 手把為 38
-//   - Joy-Con 直握：左 Joy-Con 搖桿往上推時，axisX 是不是負值（程式假設是）
-//   - Joy-Con 直握：右 Joy-Con 搖桿往右推時，axisY 是不是正值（程式假設是）
-//   - 右 Joy-Con 上印的 A、B 鍵，各自讓 a/b/x/y 哪一個變成 1（程式假設 A → a、B → x）
-//   - 右 Joy-Con 按 ZR 時 r2 會不會變成 1；按「＋」時 misc 會不會出現 0x04
+//   - Joy-Con 直握，左 Joy-Con：往上推 axisX 是負值（已實測）；往右推 axisY 是不是負值（程式假設是）
+//   - Joy-Con 直握，右 Joy-Con：往右推 axisY 是正值（已實測）；往上推 axisX 是不是正值（程式假設是）
+//   - 右 Joy-Con：A → a、B → x、ZR → r2、「＋」→ misc 0x04（已實測）
+//   - 左 Joy-Con：ZL 會不會讓 l2 變成 1；「−」會不會讓 misc 出現 0x02（程式假設是）
+//   - 大手把：左搖桿往上推 Y 是負值、右搖桿往右推 RX 是正值；右扳機是 r2 還是 throttle；＋／≡／OPTIONS 是不是 misc 0x04
 //   - 按住該支手把的 a 鍵時會不會震動
 //     Joy-Con 連上時會補送「開啟震動」指令（esp32_bluepad32 4.1.0 沒送），做法與 car_main/gamepad.cpp 相同
 //     ENABLE_JOYCON_VIBRATION 改成 0 可以比較補送前後的差別
@@ -103,7 +105,7 @@ void setup() {
   Serial.begin(115200);
   BP32.setup(&onConnected, &onDisconnected);
   BP32.enableVirtualDevice(false);
-  Serial.println("test_gamepad：請讓手把進入配對模式（兩支 Joy-Con 要分別配對）");
+  Serial.println("test_gamepad：請讓手把進入配對模式（一次配一支；要比較時可以再配第二支）");
 }
 
 void loop() {

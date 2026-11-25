@@ -205,8 +205,9 @@
       <div class="pads">
         <div><span>左 Joy-Con</span><span id="padL" class="pill idle">—</span></div>
         <div><span>右 Joy-Con</span><span id="padR" class="pill idle">—</span></div>
-        <div><span>標準手把（Xbox／PS／Pro）</span><span id="padP" class="pill idle">—</span></div>
+        <div><span>大手把（Pro／Xbox／PS）</span><span id="padP" class="pill idle">—</span></div>
       </div>
+      <div class="small muted" style="margin-top:6px">一次只用一支，第二支會被拒絕</div>
     </div>
     <div class="card">
       <h2>可以開車嗎</h2>
@@ -257,13 +258,15 @@
       <h2>搖桿（已歸零、套用死區，範圍 −512～512）</h2>
       <div class="sticks">
         <div class="stick">
-          <div class="label">左 Joy-Con 上下 → 油門 T</div>
+          <div class="label">搖桿上下 → 油門 T</div>
+          <div class="small muted">Joy-Con：那支搖桿／大手把：左搖桿</div>
           <div class="vbar"><div class="dz" id="dzT"></div><div class="mid"></div><div class="fill" id="fillT"></div></div>
           <div class="val" id="valT">—</div>
           <div class="small muted" id="txtT"></div>
         </div>
         <div class="stick">
-          <div class="label">右 Joy-Con 左右 → 轉向 S</div>
+          <div class="label">搖桿左右 → 轉向 S</div>
+          <div class="small muted">Joy-Con：同一支搖桿／大手把：右搖桿</div>
           <div class="hbar"><div class="dz" id="dzS"></div><div class="mid"></div><div class="fill" id="fillS"></div></div>
           <div class="val" id="valS">—</div>
           <div class="small muted" id="txtS"></div>
@@ -300,10 +303,10 @@
   <section class="card">
     <h2>按鍵（按住時會亮）</h2>
     <div class="keys">
-      <div class="key" id="kZR"><div class="cap">ZR</div><div><div class="name">加速</div><div class="desc">按住時速度上限 60% → 100%</div><div class="where">右 Joy-Con 背面扳機・r2()</div></div></div>
-      <div class="key" id="kPlus"><div class="cap">＋</div><div><div class="name">切換手動／自動避障</div><div class="desc">每按一次切換；手把斷線一律回到手動</div><div class="where">右 Joy-Con・misc 0x04</div></div></div>
-      <div class="key" id="kA"><div class="cap">A</div><div><div class="name">喇叭（選配）</div><div class="desc">按住響；需 config.h 的 FEATURE_BUZZER = 1</div><div class="where">右 Joy-Con・a()</div></div></div>
-      <div class="key" id="kB"><div class="cap">B</div><div><div class="name">車燈開關（選配）</div><div class="desc">按一下切換頭燈；需 FEATURE_LIGHTS = 1</div><div class="where">右 Joy-Con・x()</div></div></div>
+      <div class="key" id="kZR"><div class="cap">ZR</div><div><div class="name">加速</div><div class="desc">按住時速度上限 60% → 100%</div><div class="where">右 Joy-Con ZR・左 Joy-Con ZL・大手把右扳機（ZR／RT／R2）</div></div></div>
+      <div class="key" id="kPlus"><div class="cap">＋</div><div><div class="name">切換手動／自動避障</div><div class="desc">每按一次切換；手把斷線一律回到手動</div><div class="where">右 Joy-Con ＋・左 Joy-Con −・大手把 ＋／≡／OPTIONS</div></div></div>
+      <div class="key" id="kA"><div class="cap">A</div><div><div class="name">喇叭（選配）</div><div class="desc">按住響；需 config.h 的 FEATURE_BUZZER = 1</div><div class="where">右 Joy-Con A・大手把下方鍵（Xbox A／PS ✕）</div></div></div>
+      <div class="key" id="kB"><div class="cap">B</div><div><div class="name">車燈開關（選配）</div><div class="desc">按一下切換頭燈；需 FEATURE_LIGHTS = 1</div><div class="where">右 Joy-Con B・大手把右方鍵（Xbox B／PS ○）</div></div></div>
     </div>
   </section>
 
@@ -312,31 +315,47 @@
     <table>
       <thead><tr><th>操作</th><th>功能</th><th>測試時看什麼</th></tr></thead>
       <tbody>
-        <tr><td>左 Joy-Con 搖桿往上／往下</td><td>油門：前進／後退</td><td>T 變正／變負，判讀顯示「向前／向後」</td></tr>
-        <tr><td>右 Joy-Con 搖桿往右／往左</td><td>轉向：右轉／左轉（坦克式：左輪 = T + S、右輪 = T − S）</td><td>S 變正／變負；只推轉向時顯示「原地右轉／左轉」</td></tr>
+        <tr><td>搖桿往上／往下（Joy-Con 直握那支搖桿；大手把左搖桿）</td><td>油門：前進／後退</td><td>T 變正／變負，判讀顯示「向前／向後」</td></tr>
+        <tr><td>搖桿往右／往左（Joy-Con 同一支搖桿；大手把右搖桿）</td><td>轉向：右轉／左轉（坦克式：左輪 = T + S、右輪 = T − S）</td><td>S 變正／變負；只推轉向時顯示「原地右轉／左轉」</td></tr>
         <tr><td>同時推油門與轉向</td><td>邊走邊轉</td><td>顯示「向前偏右」等，兩輪速度不同</td></tr>
-        <tr><td>按住 ZR</td><td>加速：速度上限 60% → 100%</td><td>ZR 亮起，速度上限顯示 100%</td></tr>
-        <tr><td>按「＋」</td><td>切換手動／自動避障</td><td>模式卡片變成「自動避障」</td></tr>
+        <tr><td>按住加速鍵（ZR／ZL／右扳機）</td><td>加速：速度上限 60% → 100%</td><td>ZR 亮起，速度上限顯示 100%</td></tr>
+        <tr><td>按切換鍵（＋／−／選單鍵）</td><td>切換手動／自動避障</td><td>模式卡片變成「自動避障」</td></tr>
         <tr><td>A（按住）</td><td>喇叭（選配）</td><td>A 亮起；有接蜂鳴器且開啟 FEATURE_BUZZER 才會響</td></tr>
         <tr><td>B（按一下）</td><td>車燈開關（選配）</td><td>B 亮起；有接燈且開啟 FEATURE_LIGHTS 才會亮</td></tr>
         <tr><td>連上後放著不動 0.5 秒</td><td>搖桿自動歸零</td><td>手把狀態從「歸零中」變「就緒」，放開搖桿時 T、S 都是 0</td></tr>
-        <tr><td>關掉任一支 Joy-Con</td><td>組合改變：先停車、回到手動，放開搖桿後改用剩下那支（單 Joy-Con）</td><td>1 秒內輸出歸零；放開搖桿後「可以開車嗎」變回「可以」</td></tr>
-        <tr><td>Joy-Con 全部關掉</td><td>斷線保護：立刻停車、回到手動</td><td>1 秒內「可以開車嗎」變成「不行」、輸出歸零</td></tr>
+        <tr><td>歸零後放開搖桿</td><td>搖桿回中，可以開車</td><td>「可以開車嗎」變成「可以」</td></tr>
+        <tr><td>已經連一支時再連第二支</td><td>第二支會被拒絕（一次只用一支）</td><td>LOG 出現「拒絕 …一次只能用一支手把」，原本那支照常</td></tr>
+        <tr><td>關掉手把</td><td>斷線保護：立刻停車、回到手動，重新開始搜尋手把</td><td>1 秒內「可以開車嗎」變成「不行」、輸出歸零</td></tr>
         <tr><td>正前方 &lt; 15 cm 時往前推</td><td>防撞輔助：禁止前進、手把震動（可後退、可原地轉）</td><td>判讀出現「防撞：禁止前進」</td></tr>
       </tbody>
     </table>
     <p class="small muted" style="margin:10px 0 0">
-      標準手把（Xbox、PS、Switch Pro）：左搖桿上下 = 油門、右搖桿左右 = 轉向；右扳機（RT／R2／ZR）加速、選單鍵（≡／OPTIONS／＋）切換模式（實際對應待測）。
+      左 Joy-Con 與大手把的按鍵對應、右 Joy-Con 往上推的油門方向、左 Joy-Con 往右推的轉向方向還沒實測，方向相反就改 config.h 的 JOYCON_*_INVERTED。
       只插 USB 沒接電池時，電池保護會把「實際輸出」歸零、手把會一直小震動，屬正常；看「指令」欄就知道車子本來要怎麼走。
     </p>
   </section>
 
   <section class="card">
-    <h2>LOG</h2>
+    <h2>車上的 LOG（存在 ESP32 Flash）</h2>
+    <div class="logbar">
+      <button id="btnDump" disabled>下載車上 LOG</button>
+      <button id="btnLogInfo" disabled>查看大小</button>
+      <button id="btnLogClear" disabled>清除車上 LOG</button>
+      <span id="dumpStatus" class="small muted"></span>
+    </div>
+    <p class="small muted" style="margin:0">
+      car_main 會把開機原因、手把連線／斷線、模式切換、防撞、避障狀態、電池警告等事件，以及每秒一行狀態快照（hz = 手把每秒更新次數、lp = loop 最久幾 ms）存在 Flash，斷電也不會消失。
+      事後抓錯：<b>先關電池開關</b>，再插 USB、按「連接 ESP32」、按「下載車上 LOG」。下載期間車子會強制停車，約 10～25 秒。
+      每行開頭是「#開機次數 開機後秒數」；E = 事件、S = 快照。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>即時 LOG（這個網頁收到的序列埠輸出）</h2>
     <div class="logbar">
       <button id="btnPause">暫停</button>
       <button id="btnClear">清除</button>
-      <button id="btnSave">下載 LOG</button>
+      <button id="btnSave">下載即時 LOG</button>
       <label><input type="checkbox" id="chkGp"> 顯示 GP 資料行</label>
       <label><input type="checkbox" id="chkPad"> 顯示 pad= 狀態行</label>
       <label><input type="checkbox" id="chkScroll" checked> 自動捲動</label>
@@ -376,6 +395,10 @@ let lastGp = null;
 let prev = null;
 const savedLines = [];
 const logLines = [];
+// 下載車上 LOG（log dump）的進行狀態；null = 沒有在下載
+let dump = null;
+const DUMP_START_TIMEOUT_MS = 8000;   // 送出指令後這麼久還沒開始就放棄
+const DUMP_IDLE_TIMEOUT_MS = 5000;    // 下載中這麼久沒收到資料就放棄
 
 // ===== 解析 =====
 // 例：GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=12 zr=0 a=0 b=0 plus=0 cl=0 cr=0 ol=0 or=0 dl=300 dc=300 dr=300 bat=0.43 low=1 crit=1
@@ -394,6 +417,7 @@ function parseGp(line) {
 function onLine(line) {
   line = line.replace(/\r$/, "");
   if (!line) return;
+  if (dump && handleDumpLine(line)) return;
   const now = new Date();
   const stamp = now.toTimeString().slice(0, 8) + "." + String(now.getMilliseconds()).padStart(3, "0");
   if (savedLines.length < MAX_SAVE_LINES) savedLines.push(stamp + "  " + line);
@@ -418,14 +442,14 @@ function onLine(line) {
 function detectEvents(d, stamp) {
   if (prev) {
     const ev = [];
-    const keyName = { zr: "ZR", plus: "＋", a: "A", b: "B" };
+    const keyName = { zr: "加速鍵", plus: "切換鍵", a: "A", b: "B" };
     for (const k of Object.keys(keyName)) {
       if (d[k] && !prev[k]) ev.push(`按下 ${keyName[k]}`);
       if (!d[k] && prev[k]) ev.push(`放開 ${keyName[k]}`);
     }
     if (d.mode !== prev.mode) ev.push(`模式 → ${d.mode === "AUTO" ? "自動避障" : "手動"}`);
     if (d.pad !== prev.pad) ev.push(d.pad ? "手把就緒，可以開車" : "手把未就緒 → 停車");
-    const names = { jl: "左 Joy-Con", jr: "右 Joy-Con", pro: "標準手把" };
+    const names = { jl: "左 Joy-Con", jr: "右 Joy-Con", pro: "大手把" };
     for (const k of Object.keys(names)) {
       if (d[k] !== prev[k]) ev.push(`${names[k]}：${padText(d[k])}`);
     }
@@ -465,12 +489,12 @@ function verdictOf(d) {
 function reasonsOf(d) {
   const r = [];
   if (!d.pad) {
-    if (d.pro === 0 && d.jl === 0 && d.jr === 0) r.push(["bad", "沒有手把：連上一支或兩支 Joy-Con（或一支 Xbox／PS／Pro 手把）"]);
-    if (d.jl === 2 || d.jr === 2 || d.pro === 2) r.push(["warn", "手把組合剛改變：放開搖桿（回到中間）後才能開"]);
+    if (d.pro === 0 && d.jl === 0 && d.jr === 0) r.push(["bad", "沒有手把：連上一支 Joy-Con 或一支大手把（Switch Pro／Xbox／PS）"]);
+    if (d.jl === 2 || d.jr === 2 || d.pro === 2) r.push(["warn", "手把剛連上：放開搖桿（回到中間）後才能開"]);
     if (d.jl === 1 || d.jr === 1 || d.pro === 1) r.push(["warn", "搖桿歸零中：放開搖桿、手把放著別動"]);
     return r;
   }
-  if (d.mode === "AUTO") r.push(["", `自動避障中（狀態 ${d.auto}），搖桿不影響行駛；按「＋」回到手動`]);
+  if (d.mode === "AUTO") r.push(["", `自動避障中（狀態 ${d.auto}），搖桿不影響行駛；按切換鍵（＋／−／選單鍵）回到手動`]);
   if (d.mode === "MAN" && d.dc < ASSIST_STOP_CM && d.T > 0) r.push(["warn", `防撞：正前方 ${d.dc} cm，禁止前進（可後退、可原地轉）`]);
   if (d.mode === "MAN" && Math.min(d.dl, d.dr) < ASSIST_WARN_SIDE_CM) r.push(["warn", `側邊太近（左前 ${d.dl}／右前 ${d.dr} cm），手把震動提醒`]);
   if (d.crit) {
@@ -523,11 +547,11 @@ function render(d) {
   $("driveOk").className = "big " + (d.pad ? "" : "muted");
   $("driveOk").style.color = d.pad ? "var(--ok)" : "var(--bad)";
   $("driveWhy").textContent = d.pad
-    ? (d.pro === 2 ? "使用標準手把" : d.jl === 2 && d.jr === 2 ? "兩支 Joy-Con 都就緒" : d.jl === 2 ? "只用左 Joy-Con" : "只用右 Joy-Con")
+    ? (d.pro === 2 ? "使用大手把" : d.jl === 2 ? "使用左 Joy-Con" : "使用右 Joy-Con")
     : "斷線保護：停車中";
 
   $("mode").textContent = d.mode === "AUTO" ? "自動避障" : "手動";
-  $("autoState").textContent = d.mode === "AUTO" ? `避障狀態：${d.auto}` : "按「＋」切換到自動避障";
+  $("autoState").textContent = d.mode === "AUTO" ? `避障狀態：${d.auto}` : "按切換鍵（＋／−／選單鍵）切換到自動避障";
 
   $("bat").textContent = d.bat.toFixed(2) + " V";
   $("batWhy").textContent = d.bat < BATTERY_ABSENT_V ? "沒接電池（只插 USB）"
@@ -547,7 +571,7 @@ function render(d) {
     ? (v.angle < 0 ? "scaleX(-1)" : "none")
     : `rotate(${v.angle ?? 0}deg)`;
   const limit = d.zr ? SPEED_BOOST : SPEED_NORMAL;
-  $("speedLimit").textContent = d.pad ? `速度上限 ${limit}%${d.zr ? "（ZR 加速中）" : ""}` : "";
+  $("speedLimit").textContent = d.pad ? `速度上限 ${limit}%${d.zr ? "（加速中）" : ""}` : "";
 
   const ul = $("reasons");
   ul.innerHTML = "";
@@ -633,6 +657,95 @@ function systemLog(text, cls = "ev") {
   addLog(stamp, "[網頁] " + text, cls);
 }
 
+// ===== 車上的 LOG（Flash）=====
+// 韌體收到「log dump」後先停車，再送：
+//   === LOG DUMP BEGIN boot=12 bytes=34567 ===
+//   #11 0.523 E [log] 開機 #11 ...（每行一筆）
+//   === LOG DUMP END bytes=34567 ===
+const utf8 = new TextEncoder();
+
+async function sendCommand(text) {
+  if (!port || !port.writable) { systemLog("請先連接 ESP32", "err"); return false; }
+  const w = port.writable.getWriter();
+  try {
+    await w.write(utf8.encode(text + "\n"));
+    return true;
+  } catch (e) {
+    systemLog("送出指令失敗：" + e.message, "err");
+    return false;
+  } finally {
+    w.releaseLock();
+  }
+}
+
+async function startDump() {
+  if (dump) return;
+  dump = { started: false, lines: [], bytes: 0, expected: 0, boot: "", lastAt: performance.now(), lastUi: 0 };
+  setDumpStatus("已送出指令，等車子停住後開始傳送…");
+  updateLogButtons();
+  if (!(await sendCommand("log dump"))) { dump = null; setDumpStatus(""); updateLogButtons(); }
+}
+
+// 回傳 true = 這行屬於下載中的 LOG，不要當一般輸出處理
+function handleDumpLine(line) {
+  if (!dump.started) {
+    const m = line.match(/^=== LOG DUMP BEGIN boot=(\d+) bytes=(\d+) ===/);
+    if (!m) return false;  // 還沒開始前收到的一般輸出照常顯示
+    dump.started = true;
+    dump.boot = m[1];
+    dump.expected = Number(m[2]);
+    dump.lastAt = performance.now();
+    systemLog(`開始下載車上 LOG：${(dump.expected / 1024).toFixed(1)} KB`);
+    return true;
+  }
+  dump.lastAt = performance.now();
+  if (line.startsWith("=== LOG DUMP END")) { finishDump(true); return true; }
+  dump.lines.push(line);
+  dump.bytes += utf8.encode(line).length + 1;
+  if (dump.lastAt - dump.lastUi > 200) {
+    dump.lastUi = dump.lastAt;
+    const pct = dump.expected ? Math.min(100, (dump.bytes / dump.expected) * 100).toFixed(0) : "?";
+    setDumpStatus(`下載中 ${pct}%（${(dump.bytes / 1024).toFixed(1)}／${(dump.expected / 1024).toFixed(1)} KB）`);
+  }
+  return true;
+}
+
+function finishDump(ok) {
+  const d = dump;
+  dump = null;
+  updateLogButtons();
+  if (!d.started) {
+    setDumpStatus("");
+    systemLog("車上 LOG 沒有開始傳送：請確認燒錄的是有 Flash LOG 的新版 car_main", "err");
+    return;
+  }
+  if (!ok) systemLog(`車上 LOG 傳送中斷（收到 ${d.lines.length} 行），已下載收到的部分`, "err");
+  const now = new Date();
+  const header = [
+    `# 四驅車 Flash LOG，下載時間 ${now.toLocaleString()}，目前開機 #${d.boot}${ok ? "" : "（傳送中斷，內容不完整）"}`,
+    "# 格式：#開機次數 開機後秒數 種類 內容；E = 事件、S = 狀態快照",
+    "# 快照欄位：pad 可以開車、c 手把（JL/JR/STD）、m 模式、a 避障狀態、T/S 搖桿、zr 加速、o 左/右輪輸出 %、d 左前/正前/右前 cm、b 電池 V、hz 手把每秒更新次數、lp loop 最久 ms",
+  ];
+  const blob = new Blob([header.concat(d.lines).join("\n") + "\n"], { type: "text/plain" });
+  const a = document.createElement("a");
+  const ts = now.toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  a.href = URL.createObjectURL(blob);
+  a.download = `car_flash_log_${ts}.txt`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  setDumpStatus(`完成：${d.lines.length} 行、${(d.bytes / 1024).toFixed(1)} KB，已存成 ${a.download}`);
+  if (ok) systemLog(`車上 LOG 下載完成：${d.lines.length} 行`);
+}
+
+function setDumpStatus(text) { $("dumpStatus").textContent = text; }
+
+function updateLogButtons() {
+  const can = !!port && !dump;
+  $("btnDump").disabled = !can;
+  $("btnLogInfo").disabled = !can;
+  $("btnLogClear").disabled = !can;
+}
+
 // ===== Web Serial =====
 async function connect() {
   if (!("serial" in navigator)) return;
@@ -713,16 +826,16 @@ function setConn(kind, text) {
   $("btnReset").disabled = !connected;
   $("btnDemo").textContent = kind === "demo" ? "停止示範" : "示範模式";
   $("btnDemo").disabled = connected;
+  if (!connected && dump) finishDump(false);
+  updateLogButtons();
 }
 
 // ===== 示範模式：模擬 car_main 送出的 GP 行，不需要 ESP32 =====
 const demoScript = [
   // [持續 ms, 內容]
-  [1500, { jl: 0, jr: 0 }],
-  [1200, { jl: 0, jr: 1 }],
-  [1000, { jl: 0, jr: 2, log: "[gamepad] 右 Joy-Con 搖桿歸零完成：油門中心 0、轉向中心 55" }],
-  [800, { jl: 1, jr: 2 }],
-  [1500, { jl: 2, jr: 2, log: "[gamepad] 左 Joy-Con 搖桿歸零完成：油門中心 19、轉向中心 0" }],
+  [1500, { jr: 0 }],
+  [1200, { jr: 1, log: "[gamepad] 右 Joy-Con 已連線：Switch JoyCon Right（model=40）；停止搜尋其他手把。連線時先不要碰搖桿" }],
+  [1500, { jr: 2, log: "[gamepad] 右 Joy-Con 搖桿歸零完成：油門中心 3、轉向中心 55" }],
   [2000, { T: 420 }],
   [800, {}],
   [2000, { T: -380 }],
@@ -743,7 +856,7 @@ const demoScript = [
   [400, { plus: 1 }],
   [700, { a: 1 }],
   [500, { b: 1 }],
-  [1500, { jr: 0, log: "[gamepad] 右 Joy-Con 斷線" }],
+  [1500, { jr: 0, log: "[gamepad] 右 Joy-Con 斷線，停車；重新開始搜尋手把" }],
 ];
 
 function startDemo() {
@@ -765,8 +878,8 @@ function startDemo() {
     if (step === 0) { lastLogged = -1; }
     if (s.mode) mode = s.mode;
     if (step === 0) mode = "MAN";
-    const jl = s.jl ?? 2, jr = s.jr ?? 2;
-    const pad = jl === 2 && jr === 2 ? 1 : 0;
+    const jl = 0, jr = s.jr ?? 2;
+    const pad = jr === 2 ? 1 : 0;
     const noise = () => 0;
     let T = pad ? (s.T ?? 0) + noise() : 0;
     let S = pad ? (s.S ?? 0) + noise() : 0;
@@ -808,8 +921,12 @@ setInterval(() => {
     gpCount = 0;
     gpCountWindowStart = now;
   }
-  if (port && now - lastGpAt > STREAM_TIMEOUT_MS) {
+  if (port && !dump && now - lastGpAt > STREAM_TIMEOUT_MS) {
     $("noStream").classList.remove("hidden");
+  }
+  if (dump) {
+    const limit = dump.started ? DUMP_IDLE_TIMEOUT_MS : DUMP_START_TIMEOUT_MS;
+    if (now - dump.lastAt > limit) finishDump(false);
   }
 }, 250);
 
@@ -834,6 +951,11 @@ $("btnSave").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 for (const id of ["chkGp", "chkPad"]) $(id).onchange = renderLog;
+$("btnDump").onclick = startDump;
+$("btnLogInfo").onclick = () => sendCommand("log info");
+$("btnLogClear").onclick = () => {
+  if (confirm("確定要清除 ESP32 上的 LOG？清除後就找不回來了（建議先下載）。")) sendCommand("log clear");
+};
 
 if ("serial" in navigator) {
   navigator.serial.addEventListener("disconnect", (e) => {

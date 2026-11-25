@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "config.h"
+#include "logger.h"
 
 namespace {
 
@@ -42,7 +43,7 @@ void batteryUpdate() {
     notCriticalSinceMs = now;
   } else if (!criticalLatched && now - notCriticalSinceMs >= BATTERY_CRITICAL_HOLD_MS) {
     criticalLatched = true;
-    Serial.printf("[battery] 電壓 %.2f V 過低，停車鎖定；請關機充電，重開機才會解除\n", smoothedVolts);
+    logEvent("battery", "電壓 %.2f V 過低，停車鎖定；請關機充電，重開機才會解除", smoothedVolts);
   }
 #endif
 }

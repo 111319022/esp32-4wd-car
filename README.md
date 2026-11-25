@@ -8,18 +8,19 @@
 
 | 功能 | 說明 |
 |---|---|
-| 手動模式 | 左右兩支 Joy-Con 直握：左搖桿前進後退、右搖桿轉向，按住 ZR 加速；只連上一支時改用單搖桿操作 |
+| 手動模式 | 一次只用一支手把：一支 Joy-Con 直握（同一支搖桿上下前進後退、左右轉向），或一支 Switch Pro／Xbox／PS 手把（左搖桿前進後退、右搖桿轉向）；按住 ZR／ZL／右扳機加速 |
 | 自動避障模式 | 依左前、正前、右前三個距離，自動直行、轉向或後退 |
-| 模式切換 | 按手把的「＋」 |
+| 模式切換 | 按手把的「＋」（左 Joy-Con 是「−」，Xbox／PS 是選單鍵） |
 | 防撞輔助 | 手動時正前方小於 15 cm 禁止前進，手把震動 |
-| 斷線保護 | 手把斷線立刻停車；雙 Joy-Con 斷掉一支時先停車，放開搖桿後改用剩下那支 |
+| 斷線保護 | 手把斷線立刻停車 |
 | 電池保護 | 低電量震動提醒，電壓過低自動停車 |
+| 行車 LOG | 事件與每秒狀態存在 ESP32 的 Flash，事後插 USB 用監看網頁下載，方便抓錯 |
 | 選配 | 頭燈、煞車燈、喇叭 |
 
 ## 系統架構
 
 ```
-Joy-Con ×2 ──藍牙──┐
+手把 ×1 ────藍牙──┐
                     ▼
 HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L298N ──▶ TT 馬達 ×4
                     ▲                               │
@@ -28,16 +29,17 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
                               18650 ×2 串聯（7.4 V）─┘
 ```
 
-## 目前進度（2026-11-04）
+## 目前進度（2026-11-25）
 
 | 項目 | 狀態 |
 |---|---|
 | 規劃、材料清單、接線設計 | ✅ 完成（期中報告） |
-| 韌體 `car_main` | ✅ 可編譯、已燒錄到 ESP32 |
-| 手把：雙 Joy-Con 連線、按鍵對應、震動、搖桿歸零 | ✅ 已實測 |
-| 手把監看網頁 | ✅ 完成 |
-| 材料採購、組裝底盤 | 進行中 |
-| 馬達、超音波、電池實測與整合測試 | 待材料到齊 |
+| 韌體 `car_main` | ✅ 可編譯、可燒錄；2026-11-25 改成一次只用一支手把，並加入 Flash LOG |
+| 手把：右 Joy-Con 按鍵對應、震動、搖桿歸零 | ✅ 已實測；左 Joy-Con、大手把待測 |
+| 手把監看網頁 | ✅ 完成（可下載車上 LOG） |
+| 馬達方向 | ✅ 已實測 |
+| 超音波、電池 | 接線完成，校正待做 |
+| 整合測試 | 待測 |
 
 詳細測試結果見 [`docs/testing.md`](docs/testing.md)。
 
@@ -49,14 +51,15 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
 |---|---|
 | [`firmware/car_main/car_main.ino`](firmware/car_main/car_main.ino) | 主迴圈：讀手把 → 測距 → 讀電池 → 依模式算左右輪速度 → 輸出；手動混控、防撞輔助、斷線保護 |
 | [`firmware/car_main/config.h`](firmware/car_main/config.h) | 腳位、功能開關、所有可調參數 |
-| [`firmware/car_main/gamepad.cpp`](firmware/car_main/gamepad.cpp) | 合併左右兩支 Joy-Con、搖桿歸零、補送 Joy-Con 震動指令 |
+| [`firmware/car_main/gamepad.cpp`](firmware/car_main/gamepad.cpp) | 一次只用一支手把、連上後停止搜尋、搖桿歸零、補送 Joy-Con 震動指令 |
+| [`firmware/car_main/logger.cpp`](firmware/car_main/logger.cpp) | 事件與狀態 LOG 存在 Flash，序列埠指令下載 |
 | [`firmware/car_main/autopilot.cpp`](firmware/car_main/autopilot.cpp) | 自動避障狀態機（直行／後退／轉向） |
 | [`firmware/car_main/motors.cpp`](firmware/car_main/motors.cpp) | L298N 坦克式驅動、PWM |
 | [`firmware/car_main/sonar.cpp`](firmware/car_main/sonar.cpp) | 三顆 HC-SR04 輪流測距 |
 | [`firmware/car_main/battery.cpp`](firmware/car_main/battery.cpp) | 電池電壓監測、低電壓停車鎖定 |
 | [`firmware/car_main/extras.cpp`](firmware/car_main/extras.cpp) | 選配車燈、喇叭 |
 | [`firmware/tests/`](firmware/tests/) | 單項測試程式：馬達、手把、超音波、電池；`test_sonar_diag` 用來找超音波接線問題 |
-| [`tools/gamepad_monitor.html`](tools/gamepad_monitor.html) | 測試用網頁：用 Web Serial 讀 ESP32，即時顯示手把與判讀結果 |
+| [`tools/gamepad_monitor.html`](tools/gamepad_monitor.html) | 測試用網頁：用 Web Serial 讀 ESP32，即時顯示手把與判讀結果，下載車上 LOG |
 
 控制邏輯與設計理由分別見 [`docs/software.md`](docs/software.md) 與 [`docs/decisions.md`](docs/decisions.md)。
 
@@ -66,12 +69,13 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
 2. 照 [`docs/hardware.md`](docs/hardware.md) 接線，**第一次通電前先做「通電檢查」**。
 3. 依序跑 [`firmware/tests/`](firmware/tests/) 的單項測試（步驟見 [`docs/testing.md`](docs/testing.md)）。
 4. 打開 `firmware/car_main/car_main.ino` 上傳主程式。用 Chrome 打開 [`tools/gamepad_monitor.html`](tools/gamepad_monitor.html) 可以即時看手把讀值與判讀結果。
-5. Joy-Con 按住側邊滑軌上的同步鍵配對（連線時先不要碰搖桿），搖桿歸零完成後就能開車。兩支都連上是雙手操作，只連上一支也能單手開。
+5. 讓**一支**手把進入配對模式（連線時先不要碰搖桿），歸零完成、放開搖桿後就能開車。按鍵與事後抓錯的步驟見 [`docs/operation.md`](docs/operation.md)。
 
 ## 文件
 
 | 文件 | 內容 |
 |---|---|
+| [`docs/operation.md`](docs/operation.md) | **操作說明**：開車步驟、各手把按鍵、事後下載 LOG 抓錯 |
 | [`docs/BOM.md`](docs/BOM.md) | 材料清單與採購狀態 |
 | [`docs/hardware.md`](docs/hardware.md) | 接線、腳位、電源、機構配置 |
 | [`docs/software.md`](docs/software.md) | 韌體架構、控制邏輯、參數調整 |

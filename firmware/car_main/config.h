@@ -11,6 +11,7 @@
 #define FEATURE_BUZZER 0           // 選配：蜂鳴器喇叭
 #define DEBUG_SERIAL 1             // 每 200 ms 在序列埠印出狀態（給人看）
 #define DEBUG_STREAM 1             // 每 DEBUG_STREAM_MS 印一行「GP ...」給 tools/gamepad_monitor.html 讀
+#define FEATURE_FLASH_LOG 1        // 把事件與狀態快照存到 ESP32 的 Flash，事後插 USB 用監看網頁下載（見 logger.h）
 
 // ===== 腳位：L298N 馬達驅動 =====
 // 左側兩顆馬達並聯接 A 通道（OUT1/OUT2），右側兩顆並聯接 B 通道（OUT3/OUT4）
@@ -61,13 +62,12 @@ constexpr int STICK_DEADZONE = 40;          // 搖桿死區（滿刻度約 512�
 constexpr unsigned long STICK_CENTER_SAMPLE_MS = 500;
 constexpr int STICK_CENTER_MAX_SPREAD = 40;   // 取樣期間變化超過這個值 → 判定搖桿在動，重新取樣
 constexpr int STICK_CENTER_MAX_OFFSET = 150;  // 中心偏超過這個值 → 判定有人推著搖桿，重新取樣（實測右 Joy-Con 約 +60）
-// 雙 Joy-Con：左 Joy-Con 往上推應該前進、右 Joy-Con 往右推應該右轉，相反就改成 true
-constexpr bool JOYCON_THROTTLE_INVERTED = false;
-constexpr bool JOYCON_STEER_INVERTED = false;
-// 單支 Joy-Con 時才會用到的另一軸（方向是推算的，尚未實測）：
-//   只用左 Joy-Con 時往右推應該右轉、只用右 Joy-Con 時往上推應該前進，相反就改成 true
-constexpr bool JOYCON_LEFT_STEER_INVERTED = false;
-constexpr bool JOYCON_RIGHT_THROTTLE_INVERTED = false;
+// 單支 Joy-Con 直握：同一支搖桿上下 = 油門、左右 = 轉向（見 docs/decisions.md D15）
+// 方向相反就改成 true。標註「實測」的是 2026-11-04 用 test_gamepad 確認過的，「推算」的還沒實測
+constexpr bool JOYCON_LEFT_THROTTLE_INVERTED = false;   // 左 Joy-Con 往上推應該前進（實測）
+constexpr bool JOYCON_LEFT_STEER_INVERTED = false;      // 左 Joy-Con 往右推應該右轉（推算）
+constexpr bool JOYCON_RIGHT_THROTTLE_INVERTED = false;  // 右 Joy-Con 往上推應該前進（推算）
+constexpr bool JOYCON_RIGHT_STEER_INVERTED = false;     // 右 Joy-Con 往右推應該右轉（實測）
 
 // ===== 防撞輔助（手動模式）=====
 constexpr int ASSIST_STOP_CM = 15;       // 正前方小於此距離：禁止前進
@@ -102,3 +102,15 @@ constexpr float BATTERY_ABSENT_V = 5.0f;       // 低於此值視為沒接電池
 // ===== 除錯輸出 =====
 constexpr unsigned long DEBUG_SERIAL_MS = 200;  // DEBUG_SERIAL：給人看的狀態行間隔
 constexpr unsigned long DEBUG_STREAM_MS = 100;  // DEBUG_STREAM：給 tools/gamepad_monitor.html 讀的「GP ...」行間隔
+
+// ===== Flash LOG（FEATURE_FLASH_LOG，見 logger.h）=====
+// 寫 Flash 會讓程式卡住數 ms～數十 ms，所以先存在 RAM，停車時才寫進 Flash
+constexpr size_t LOG_RAM_BUFFER_BYTES = 16384;      // RAM 暫存區大小（約可撐 3～4 分鐘不停車的行駛）
+constexpr size_t LOG_FILE_MAX_BYTES = 131072;       // 單一檔案上限（128 KB）；超過就換新檔，只保留前一個檔案
+constexpr unsigned long LOG_FLUSH_STOPPED_MS = 1000;  // 車子停住這麼久之後，把 RAM 暫存寫進 Flash
+constexpr size_t LOG_FLUSH_MIN_BYTES = 512;            // 停車時：有事件、或暫存超過這麼多、
+constexpr unsigned long LOG_FLUSH_MAX_WAIT_MS = 5000;  //         或距離上次寫入超過這麼久，才寫（避免一直小量寫 Flash）
+constexpr unsigned long LOG_SNAPSHOT_DRIVE_MS = 1000; // 手把可以開車時，每隔多久記一行狀態快照
+constexpr unsigned long LOG_SNAPSHOT_IDLE_MS = 10000; // 沒有手把（車子不能開）時的快照間隔
+constexpr size_t LOG_FORCE_FLUSH_BYTES = 14336;     // 行駛中暫存超過這麼多也要寫入（會短暫卡住，一次最多寫 LOG_FLUSH_CHUNK_BYTES）
+constexpr size_t LOG_FLUSH_CHUNK_BYTES = 1024;
