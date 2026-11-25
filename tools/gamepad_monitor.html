@@ -249,7 +249,7 @@
         <div id="sC"><div class="small">正前 0°</div><div class="cm" id="dC">—</div></div>
         <div id="sR"><div class="small">右前 +30°</div><div class="cm" id="dR">—</div></div>
       </div>
-      <p class="small muted" style="margin:10px 0 0">沒接超音波時會一直顯示 300 cm（量不到回波），屬正常。手動模式下正前方 &lt; 15 cm 會禁止前進。</p>
+      <p class="small muted" style="margin:10px 0 0">沒接超音波時會一直顯示 300 cm（量不到回波），屬正常。手動模式下正前方 &lt; 25 cm 會禁止前進。</p>
     </div>
   </section>
 
@@ -303,7 +303,7 @@
   <section class="card">
     <h2>按鍵（按住時會亮）</h2>
     <div class="keys">
-      <div class="key" id="kZR"><div class="cap">ZR</div><div><div class="name">加速</div><div class="desc">按住時速度上限 60% → 100%</div><div class="where">右 Joy-Con ZR・左 Joy-Con ZL・大手把右扳機（ZR／RT／R2）</div></div></div>
+      <div class="key" id="kZR"><div class="cap">ZR</div><div><div class="name">加速</div><div class="desc">按住時速度上限 85% → 100%</div><div class="where">右 Joy-Con ZR・左 Joy-Con ZL 或 L・大手把右扳機（ZR／RT／R2）</div></div></div>
       <div class="key" id="kPlus"><div class="cap">＋</div><div><div class="name">切換手動／自動避障</div><div class="desc">每按一次切換；手把斷線一律回到手動</div><div class="where">右 Joy-Con ＋・左 Joy-Con −・大手把 ＋／≡／OPTIONS</div></div></div>
       <div class="key" id="kA"><div class="cap">A</div><div><div class="name">喇叭（選配）</div><div class="desc">按住響；需 config.h 的 FEATURE_BUZZER = 1</div><div class="where">右 Joy-Con A・大手把下方鍵（Xbox A／PS ✕）</div></div></div>
       <div class="key" id="kB"><div class="cap">B</div><div><div class="name">車燈開關（選配）</div><div class="desc">按一下切換頭燈；需 FEATURE_LIGHTS = 1</div><div class="where">右 Joy-Con B・大手把右方鍵（Xbox B／PS ○）</div></div></div>
@@ -318,7 +318,7 @@
         <tr><td>搖桿往上／往下（Joy-Con 直握那支搖桿；大手把左搖桿）</td><td>油門：前進／後退</td><td>T 變正／變負，判讀顯示「向前／向後」</td></tr>
         <tr><td>搖桿往右／往左（Joy-Con 同一支搖桿；大手把右搖桿）</td><td>轉向：右轉／左轉（坦克式：左輪 = T + S、右輪 = T − S）</td><td>S 變正／變負；只推轉向時顯示「原地右轉／左轉」</td></tr>
         <tr><td>同時推油門與轉向</td><td>邊走邊轉</td><td>顯示「向前偏右」等，兩輪速度不同</td></tr>
-        <tr><td>按住加速鍵（ZR／ZL／右扳機）</td><td>加速：速度上限 60% → 100%</td><td>ZR 亮起，速度上限顯示 100%</td></tr>
+        <tr><td>按住加速鍵（ZR／ZL／右扳機）</td><td>加速：速度上限 85% → 100%</td><td>ZR 亮起，速度上限顯示 100%</td></tr>
         <tr><td>按切換鍵（＋／−／選單鍵）</td><td>切換手動／自動避障</td><td>模式卡片變成「自動避障」</td></tr>
         <tr><td>A（按住）</td><td>喇叭（選配）</td><td>A 亮起；有接蜂鳴器且開啟 FEATURE_BUZZER 才會響</td></tr>
         <tr><td>B（按一下）</td><td>車燈開關（選配）</td><td>B 亮起；有接燈且開啟 FEATURE_LIGHTS 才會亮</td></tr>
@@ -326,7 +326,7 @@
         <tr><td>歸零後放開搖桿</td><td>搖桿回中，可以開車</td><td>「可以開車嗎」變成「可以」</td></tr>
         <tr><td>已經連一支時再連第二支</td><td>第二支會被拒絕（一次只用一支）</td><td>LOG 出現「拒絕 …一次只能用一支手把」，原本那支照常</td></tr>
         <tr><td>關掉手把</td><td>斷線保護：立刻停車、回到手動，重新開始搜尋手把</td><td>1 秒內「可以開車嗎」變成「不行」、輸出歸零</td></tr>
-        <tr><td>正前方 &lt; 15 cm 時往前推</td><td>防撞輔助：禁止前進、手把震動（可後退、可原地轉）</td><td>判讀出現「防撞：禁止前進」</td></tr>
+        <tr><td>正前方 &lt; 25 cm 時往前推</td><td>防撞輔助：禁止前進、手把震動（可後退、可原地轉）</td><td>判讀出現「防撞：禁止前進」</td></tr>
       </tbody>
     </table>
     <p class="small muted" style="margin:10px 0 0">
@@ -370,10 +370,10 @@
 "use strict";
 
 // ===== 和韌體對應的常數（config.h）=====
-const DEADZONE = 40;               // STICK_DEADZONE
-const SPEED_NORMAL = 60;           // SPEED_LIMIT_NORMAL_PCT
+const DEADZONE = 0;                // 韌體送來的 T／S 已經扣掉死區（STICK_DEADZONE），這裡不用再畫
+const SPEED_NORMAL = 85;           // SPEED_LIMIT_NORMAL_PCT
 const SPEED_BOOST = 100;           // SPEED_LIMIT_BOOST_PCT
-const ASSIST_STOP_CM = 15;         // ASSIST_STOP_CM
+const ASSIST_STOP_CM = 25;         // ASSIST_STOP_CM
 const ASSIST_WARN_SIDE_CM = 10;    // ASSIST_WARN_SIDE_CM
 const BATTERY_ABSENT_V = 5.0;      // BATTERY_ABSENT_V
 const STREAM_TIMEOUT_MS = 1500;    // 超過這麼久沒收到 GP 行就顯示「資料中斷」
@@ -887,10 +887,10 @@ function startDemo() {
     const dc = s.dc ?? 300;
     let cl = 0, cr = 0;
     if (pad && mode === "MAN") {
-      const limit = zr ? 100 : 60;
+      const limit = zr ? SPEED_BOOST : SPEED_NORMAL;
       let t = Math.trunc(T * 100 / 512);
       const st = Math.trunc(S * 100 / 512);
-      if (dc < 15 && t > 0) t = 0;
+      if (dc < ASSIST_STOP_CM && t > 0) t = 0;
       cl = Math.trunc(Math.max(-100, Math.min(100, t + st)) * limit / 100);
       cr = Math.trunc(Math.max(-100, Math.min(100, t - st)) * limit / 100);
     } else if (pad) {

@@ -28,6 +28,9 @@ const char* const SLOT_SHORT_NAMES[SLOT_COUNT] = {"JL", "JR", "STD"};
 
 ControllerPtr active = nullptr;  // 目前使用中的那一支手把
 Slot activeSlot = SLOT_STANDARD;
+bool activeStreams = false;      // Switch 手把：連線時會持續送資料，可以用「多久沒收到資料」判斷失聯
+unsigned long lastDataMs = 0;    // 最近一次收到新資料的時間
+bool dataStalled = false;        // 超過 PAD_DATA_TIMEOUT_MS 沒收到資料
 
 GamepadState state;
 bool prevPlus = false;
@@ -121,6 +124,9 @@ void onConnected(ControllerPtr ctl) {
 
   active = ctl;
   activeSlot = slot;
+  activeStreams = slot != SLOT_STANDARD || model == Controller::CONTROLLER_TYPE_SwitchProController;
+  lastDataMs = millis();
+  dataStalled = false;
   calibration = StickCalibration();
   if (slot != SLOT_STANDARD) enableJoyConVibration(ctl);
   // 已經有手把了，停止搜尋新手把：藍牙不用一直掃描，連線比較穩、延遲比較小
@@ -134,10 +140,6 @@ void onDisconnected(ControllerPtr ctl) {
   active = nullptr;
   BP32.enableNewBluetoothConnections(true);
   logEvent("gamepad", "%s 斷線，停車；重新開始搜尋手把", SLOT_NAMES[activeSlot]);
-}
-
-int applyDeadzone(int value) {
-  return abs(value) < STICK_DEADZONE ? 0 : value;
 }
 
 // ===== 原始搖桿讀值：[0] = 油門（正值前進）、[1] = 轉向（正值右轉）=====
@@ -195,22 +197,24 @@ void updateCalibration(ControllerPtr ctl) {
   logEvent("gamepad", "%s 搖桿歸零完成：油門中心 %d、轉向中心 %d", SLOT_NAMES[activeSlot], avg[0], avg[1]);
 }
 
-// 扣掉中心點，並把兩側各自拉回 ±512 的滿刻度（不然偏移那一側會推不到底）
-int applyCenter(int value, int center) {
-  long scaled;
-  if (value >= center) {
-    scaled = (long)(value - center) * 512 / (512 - center);
-  } else {
-    scaled = (long)(value - center) * 512 / (512 + center);
-  }
-  return constrain((int)scaled, -512, 512);
+// 扣掉中心點、套死區，再把「死區～推到底」線性放大到 0～±512：
+//   離中心 < STICK_DEADZONE → 0；離中心 ≥ fullTravel → ±512（100%）
+// 實測 Joy-Con 推到底離中心只有約 ±380，所以不能假設 ±512，不然永遠推不到全速
+int shapeAxis(int value, int center, int fullTravel) {
+  int delta = value - center;
+  int magnitude = abs(delta);
+  if (magnitude < STICK_DEADZONE) return 0;
+  long scaled = (long)(magnitude - STICK_DEADZONE) * 512 / (fullTravel - STICK_DEADZONE);
+  if (scaled > 512) scaled = 512;
+  return delta > 0 ? (int)scaled : -(int)scaled;
 }
 
 void readSticks(GamepadState& next) {
   int v[2];
   rawAxes(active, v);
-  next.throttle = applyDeadzone(applyCenter(v[0], calibration.center[0]));
-  next.steer = applyDeadzone(applyCenter(v[1], calibration.center[1]));
+  int fullTravel = activeSlot == SLOT_STANDARD ? STICK_FULL_TRAVEL_STANDARD : STICK_FULL_TRAVEL_JOYCON;
+  next.throttle = shapeAxis(v[0], calibration.center[0], fullTravel);
+  next.steer = shapeAxis(v[1], calibration.center[1], fullTravel);
 }
 
 // 按鍵：plus = 切換模式鍵、b = 車燈鍵
@@ -223,9 +227,10 @@ void readButtons(GamepadState& next, bool& plus, bool& b) {
     plus = ctl->miscStart();
     b = ctl->x();
   } else if (activeSlot == SLOT_LEFT) {
-    // 左 Joy-Con 沒有「＋」，改用「−」切換模式；ZL 加速。按鍵對應尚未實測，請用 test_gamepad 確認
-    next.boost = ctl->l2();       // ZL
-    next.hornHeld = ctl->a();     // 選配喇叭
+    // 左 Joy-Con（2026-11-25 實測）：ZL → r2()、L → l2()、SL → l1()、SR → r1()、「−」→ misc 0x02
+    // 左 Joy-Con 沒有「＋」，改用「−」切換模式；ZL 或 L 加速
+    next.boost = ctl->r2() || ctl->l2();
+    next.hornHeld = ctl->a();     // 選配喇叭（對應哪顆鍵待實測）
     plus = ctl->miscSelect();     // 「−」
     b = ctl->x();                 // 選配車燈
   } else {
@@ -253,9 +258,23 @@ void gamepadUpdate() {
   BP32.update();
 
   bool usable = isUsable(active);
-  if (usable && active->hasData()) updateCount++;
+  unsigned long now = millis();
+  if (usable && active->hasData()) {
+    updateCount++;
+    lastDataMs = now;
+    if (dataStalled) {
+      dataStalled = false;
+      logEvent("gamepad", "%s 恢復送資料", SLOT_NAMES[activeSlot]);
+    }
+  }
+  // 失聯保護：Switch 手把超過 PAD_DATA_TIMEOUT_MS 沒送資料就停車（Bluepad32 不一定會回報斷線，
+  // 這時讀到的會是最後一筆搖桿值，不停車的話車子會照最後的指令一直跑）
+  if (usable && activeStreams && !dataStalled && now - lastDataMs > PAD_DATA_TIMEOUT_MS) {
+    dataStalled = true;
+    logEvent("gamepad", "%s 超過 %lu ms 沒有送資料，當作失聯、停車", SLOT_NAMES[activeSlot], PAD_DATA_TIMEOUT_MS);
+  }
   if (usable) updateCalibration(active);
-  bool ready = usable && calibration.done;
+  bool ready = usable && calibration.done && !dataStalled;
 
   GamepadState next;
   bool plus = false;

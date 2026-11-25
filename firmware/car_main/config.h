@@ -55,9 +55,19 @@ constexpr float LEFT_TRIM = 1.0f;
 constexpr float RIGHT_TRIM = 1.0f;
 
 // ===== 手動模式 =====
-constexpr int SPEED_LIMIT_NORMAL_PCT = 60;  // 平常的速度上限
-constexpr int SPEED_LIMIT_BOOST_PCT = 100;  // 按住 ZR 時的速度上限
-constexpr int STICK_DEADZONE = 40;          // 搖桿死區（滿刻度約 512，套用在歸零之後）
+constexpr int SPEED_LIMIT_NORMAL_PCT = 85;  // 平常的速度上限（2026-11-25 由 60 調高：實測太慢）
+constexpr int SPEED_LIMIT_BOOST_PCT = 100;  // 按住加速鍵時的速度上限
+// 搖桿死區：歸零後離中心小於這個值當作 0（原始讀值單位，滿刻度約 ±512）。
+// 2026-11-25 實測左 Joy-Con 放開後每次回到的位置差 ±35，偶爾到 50，40 不夠 → 車子會自己慢慢轉
+constexpr int STICK_DEADZONE = 60;
+// 搖桿推到底時離中心多遠就算 100%（原始讀值單位）。超過死區後在「死區～這個值」之間線性放大到 ±512
+// 2026-11-25 實測左 Joy-Con 離中心只有約 ±380（上 −469、下 +294、中心約 −88），以前假設 ±512，
+// 所以往前最多只到 90%、往後只到 64%。取 340 留一點餘裕，斜推也推得到 100%
+constexpr int STICK_FULL_TRAVEL_JOYCON = 340;
+constexpr int STICK_FULL_TRAVEL_STANDARD = 480;  // 大手把（Switch Pro、Xbox、PS），待實測
+// Switch 手把（Joy-Con、Switch Pro）連線時會持續送資料（約 60 次／秒）。超過這麼久沒收到新資料，
+// 就當作手把失聯、停車（2026-11-25 實測：手把資料停了 70 秒，Bluepad32 卻沒有回報斷線）
+constexpr unsigned long PAD_DATA_TIMEOUT_MS = 500;
 // 連線時自動歸零：手把連上後取這段時間的平均當中心點，歸零完成前車子不會動
 constexpr unsigned long STICK_CENTER_SAMPLE_MS = 500;
 constexpr int STICK_CENTER_MAX_SPREAD = 40;   // 取樣期間變化超過這個值 → 判定搖桿在動，重新取樣
@@ -70,7 +80,7 @@ constexpr bool JOYCON_RIGHT_THROTTLE_INVERTED = false;  // 右 Joy-Con 往上推
 constexpr bool JOYCON_RIGHT_STEER_INVERTED = false;     // 右 Joy-Con 往右推應該右轉（實測）
 
 // ===== 防撞輔助（手動模式）=====
-constexpr int ASSIST_STOP_CM = 15;       // 正前方小於此距離：禁止前進
+constexpr int ASSIST_STOP_CM = 25;       // 正前方小於此距離：禁止前進（速度上限調高後由 15 加大）
 constexpr int ASSIST_WARN_SIDE_CM = 10;  // 左前／右前小於此距離：只震動提醒
 constexpr int RUMBLE_WARN_MS = 200;
 constexpr int RUMBLE_COOLDOWN_MS = 600;  // 兩次震動之間至少間隔
