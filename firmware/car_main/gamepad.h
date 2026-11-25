@@ -1,11 +1,12 @@
-// gamepad.h — 透過 Bluepad32 讀取 Switch 手把
-// 主要用左右兩支 Joy-Con（兩支都連上才能開車），也接受一支 Pro 手把當備用
+// gamepad.h — 透過 Bluepad32 讀取手把（Joy-Con 與標準手把）
+// 主要用左右兩支 Joy-Con，只連上一支 Joy-Con（左或右）也能開，
+// 也接受一支標準手把（Switch Pro、Xbox、PS4／PS5 等）
 #pragma once
 
 struct GamepadState {
-  bool connected = false;  // 雙 Joy-Con 都在線，或 Pro 手把在線
-  int throttle = 0;  // 油門，-512～512，正值前進（左 Joy-Con 搖桿上下）
-  int steer = 0;     // 轉向，-512～512，正值右轉（右 Joy-Con 搖桿左右）
+  bool connected = false;  // 可以開車：有可用的手把組合、歸零完成，且組合改變後搖桿已回中
+  int throttle = 0;  // 油門，-512～512，正值前進（雙 Joy-Con 時是左搖桿上下，單支時是那支搖桿上下）
+  int steer = 0;     // 轉向，-512～512，正值右轉（雙 Joy-Con 時是右搖桿左右，單支時是那支搖桿左右）
   bool boost = false;              // 按住 ZR：加速
   bool modeTogglePressed = false;  // 「＋」剛按下（只在按下那一次為 true）
   bool hornHeld = false;           // A：喇叭（選配）

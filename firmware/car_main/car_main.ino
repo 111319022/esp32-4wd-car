@@ -31,7 +31,7 @@ void setup() {
   extrasBegin();
   gamepadBegin();
 
-  Serial.println("等待手把連線：左右兩支 Joy-Con 各按住側邊同步鍵（或一支 Pro 手把）...");
+  Serial.println("等待手把連線：Joy-Con（一支或左右兩支）按住側邊同步鍵（或一支 Xbox／PS／Switch Pro 手把）...");
 }
 
 // 手動模式：搖桿 → 左右輪速度（%），含防撞輔助

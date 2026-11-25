@@ -64,6 +64,10 @@ constexpr int STICK_CENTER_MAX_OFFSET = 150;  // 中心偏超過這個值 → �
 // 雙 Joy-Con：左 Joy-Con 往上推應該前進、右 Joy-Con 往右推應該右轉，相反就改成 true
 constexpr bool JOYCON_THROTTLE_INVERTED = false;
 constexpr bool JOYCON_STEER_INVERTED = false;
+// 單支 Joy-Con 時才會用到的另一軸（方向是推算的，尚未實測）：
+//   只用左 Joy-Con 時往右推應該右轉、只用右 Joy-Con 時往上推應該前進，相反就改成 true
+constexpr bool JOYCON_LEFT_STEER_INVERTED = false;
+constexpr bool JOYCON_RIGHT_THROTTLE_INVERTED = false;
 
 // ===== 防撞輔助（手動模式）=====
 constexpr int ASSIST_STOP_CM = 15;       // 正前方小於此距離：禁止前進

@@ -10,7 +10,7 @@
 | `config.h` | 腳位、功能開關、所有可調參數 | — |
 | `motors.*` | L298N 坦克式驅動 | `motorsBegin`、`motorsSet`、`motorsSetPercent`、`motorsStop` |
 | `sonar.*` | 三顆 HC-SR04 輪流測距 | `sonarBegin`、`sonarUpdate`、`sonarCm` |
-| `gamepad.*` | Bluepad32 手把：合併左右兩支 Joy-Con（或一支 Pro 手把當備用）、搖桿歸零、補送 Joy-Con 震動指令 | `gamepadBegin`、`gamepadUpdate`、`gamepadState`、`gamepadRumble`、`gamepadSlotStatus` |
+| `gamepad.*` | Bluepad32 手把：合併左右兩支 Joy-Con、單支 Joy-Con，或一支標準手把（Xbox、PS、Switch Pro）、搖桿歸零、補送 Joy-Con 震動指令 | `gamepadBegin`、`gamepadUpdate`、`gamepadState`、`gamepadRumble`、`gamepadSlotStatus` |
 | `autopilot.*` | 自動避障狀態機 | `autopilotReset`、`autopilotStep`、`autopilotStateName` |
 | `battery.*` | 電池電壓監測 | `batteryBegin`、`batteryUpdate`、`batteryVolts`、`batteryLow`、`batteryCritical` |
 | `extras.*` | 選配車燈、喇叭 | `extrasBegin`、`extrasUpdate`、`extrasOff` |
@@ -31,7 +31,9 @@
 
 ## 手把對應
 
-主要用**左右兩支 Joy-Con 直握**（一手一支）。兩支都連上才算「手把已連線」；**任何一支斷線就停車**並回到手動。也可以改用一支 Pro 手把（備用）；已經連上 Joy-Con 時 Pro 手把會被拒絕，反之亦然。
+主要用**左右兩支 Joy-Con 直握**（一手一支）；**只連上一支 Joy-Con（左或右）也能開**，這時用同一支搖桿控制油門和轉向（見下方「單支 Joy-Con」與 decisions.md D13）。也可以改用一支**標準手把**（Xbox、PS4／PS5、Switch Pro 等雙搖桿手把，見 decisions.md D14）；已經連上 Joy-Con 時標準手把會被拒絕，反之亦然。
+
+程式會自動判斷目前的組合（雙 Joy-Con／只有左／只有右／Pro）。**組合一改變**（多連一支、斷掉一支）就先停車、回到手動，等搖桿回到中間（T、S 都是 0）才能繼續開，避免同一支搖桿的意義突然改變造成暴衝；**全部斷線就停車**。另一支已經連上、還在歸零時，車子也會先停著，等它歸零完成就變成雙 Joy-Con。
 
 ### 雙 Joy-Con（主要）
 
@@ -53,9 +55,23 @@ Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都�
 - 歸零完成前這支手把不算可用，`connected = false`，車子不會動。
 - 取樣期間變化超過 `STICK_CENTER_MAX_SPREAD`，或中心偏超過 `STICK_CENTER_MAX_OFFSET`，判定有人在推搖桿，序列埠印「歸零失敗：請放開搖桿」並重新取樣。
 - 之後的讀值扣掉中心點，兩側再各自拉回 ±512 的滿刻度，最後才套死區 `STICK_DEADZONE`。
-- **連線時不要碰搖桿。** Pro 手把也一樣會歸零。
+- **連線時不要碰搖桿。** 標準手把也一樣會歸零。
 
 上表已在 2026-11-04 用 `test_gamepad` 實測確認（見 `docs/testing.md`）。
+
+### 單支 Joy-Con（只連上一支時自動使用）
+
+一樣直握，同一支搖桿上下是油門、左右是轉向，混控方式和雙 Joy-Con 相同。
+
+| | 只有右 Joy-Con | 只有左 Joy-Con |
+|---|---|---|
+| 油門 T（往上推前進） | `axisX()`（推算，待實測） | `-axisX()`（實測） |
+| 轉向 S（往右推右轉） | `axisY()`（實測） | `-axisY()`（推算，待實測） |
+| 加速 | ZR：`r2()` | ZL：`l2()`（待實測） |
+| 切換手動／自動 | 「＋」：`MISC_BUTTON_START` | 「−」：`miscSelect()`（待實測） |
+| 喇叭／車燈（選配） | A：`a()`／B：`x()` | `a()`／`x()`（對應哪顆鍵待實測） |
+
+「推算」的兩個方向是依 Bluepad32 把 Joy-Con 轉 90 度的關係推出來的，還沒實測；相反就改 `config.h` 的 `JOYCON_RIGHT_THROTTLE_INVERTED`／`JOYCON_LEFT_STEER_INVERTED`。
 
 **Joy-Con 震動**：Joy-Con 要先收到子指令 `0x48`（開啟震動）才會震，esp32_bluepad32 4.1.0 初始化時沒有送（Bluepad32 5.0 才補上）。`gamepad.cpp` 的 `enableJoyConVibration()` 會在 Joy-Con 連上時補送一次：
 
@@ -67,18 +83,20 @@ Bluepad32 把單支 Joy-Con 當成「橫握」的小手把，軸向和按鍵都�
 
 2026-11-04 實測：補送後 Joy-Con 會震。
 
-### Pro 手把（備用）
+### 標準手把（Xbox、PS4／PS5、Switch Pro）
 
-| 按鍵 | 功能 | 程式 |
-|---|---|---|
-| 左搖桿上下 | 油門 T | `-axisY()`（往上推是負值，所以取負號） |
-| 右搖桿左右 | 轉向 S | `axisRX()` |
-| ZR（按住） | 速度上限 60% → 100% | `r2()` 或 `throttle() > 512` |
-| ＋ | 切換手動／自動 | `miscButtons() & MISC_BUTTON_START` |
-| A | 喇叭（選配） | `a()` |
-| B | 車燈開關（選配） | `b()` |
+不是 Joy-Con 的雙搖桿手把都用同一套對應（程式裡沿用 `pro` 這個名字）：
 
-⚠️ Bluepad32 依「按鍵位置」對應（Xbox 配置），Switch 手把上印的 A/B 可能和 `a()`/`b()` 相反。請用 `test_gamepad` 確認後更新本表。
+| 功能 | Xbox | PS4／PS5 | Switch Pro | 程式 |
+|---|---|---|---|---|
+| 油門 T | 左搖桿上下 | 左搖桿上下 | 左搖桿上下 | `-axisY()`（往上推是負值，所以取負號） |
+| 轉向 S | 右搖桿左右 | 右搖桿左右 | 右搖桿左右 | `axisRX()` |
+| 加速（按住，60% → 100%） | RT | R2 | ZR | `r2()` 或 `throttle() > 512` |
+| 切換手動／自動 | ≡ 選單鍵 | OPTIONS | ＋ | `miscButtons() & MISC_BUTTON_START` |
+| 喇叭（選配） | A | ✕ | 位置在下方的鍵（印 B） | `a()` |
+| 車燈開關（選配） | B | ○ | 位置在右方的鍵（印 A） | `b()` |
+
+Bluepad32 依 Xbox 的「按鍵位置」對應，所以 Xbox 手把的 A/B 就是 `a()`/`b()`；其他手把以位置為準。以上對應都還沒實測，請用 `test_gamepad` 確認後更新本表。新款 Xbox 手把（Series X|S、Elite 2、韌體更新過的 One S）用 BLE 連線，esp32_bluepad32 4.1.0 預設有開啟 BLE。
 
 ## 模式
 
@@ -130,7 +148,8 @@ TURN 回到 CRUISE 的條件是正前 > `AUTO_FRONT_CM + AUTO_CLEAR_MARGIN_CM`�
 
 | 情況 | 行為 |
 |---|---|
-| 手把斷線（雙 Joy-Con 時任何一支），或搖桿還在歸零 | 立刻停車、關閉車燈喇叭、回到手動模式 |
+| 手把全部斷線，或搖桿還在歸零 | 立刻停車、關閉車燈喇叭、回到手動模式 |
+| 手把組合改變（例如雙 Joy-Con 斷掉一支） | 立刻停車、回到手動；放開搖桿後改用剩下的組合繼續開 |
 | 電池 < `BATTERY_LOW_V`（7.0 V） | 手把震動提醒 |
 | 電池 < `BATTERY_CRITICAL_V`（6.6 V） | 強制停車並震動 |
 | 電池連續 < 6.6 V 達 `BATTERY_CRITICAL_HOLD_MS`（3 秒） | **鎖定停車**，重開機才解除 |
@@ -152,8 +171,8 @@ GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=0 zr=0 a=0 b=0 plus=0 cl=0 c
 
 | 欄位 | 意義 |
 |---|---|
-| `pad` | 1 = 可以開車（兩支 Joy-Con 都就緒，或 Pro 手把就緒） |
-| `jl`／`jr`／`pro` | 左 Joy-Con／右 Joy-Con／Pro 手把：0 未連線、1 歸零中、2 就緒 |
+| `pad` | 1 = 可以開車（雙 Joy-Con、單支 Joy-Con 或標準手把就緒，且組合改變後搖桿已回中） |
+| `jl`／`jr`／`pro` | 左 Joy-Con／右 Joy-Con／標準手把（Xbox、PS、Switch Pro）：0 未連線、1 歸零中、2 就緒 |
 | `mode`／`auto` | `MAN` 手動／`AUTO` 自動；自動避障狀態機目前狀態 |
 | `T`／`S` | 歸零、死區之後的油門／轉向（−512～512） |
 | `zr`／`a`／`b`／`plus` | 按鍵是否按住 |
@@ -184,7 +203,7 @@ GP pad=1 jl=2 jr=2 pro=0 mode=MAN auto=CRUISE T=0 S=0 zr=0 a=0 b=0 plus=0 cl=0 c
 
 - [x] 第一次編譯 `car_main`（2026-11-04，無錯誤）
 - [x] 用 `test_gamepad` 確認雙 Joy-Con 的 A/B、ZR、「＋」、搖桿方向與震動（2026-11-04）
-- [ ] 用 `test_gamepad` 確認備用 Pro 手把的 A/B 對應
+- [ ] 用 `test_gamepad` 確認標準手把（Xbox、PS、Switch Pro）的搖桿方向與按鍵對應
 - [ ] 超音波加中位數濾波（取最近 3 次的中位數），減少偶發的錯誤讀值
 - [ ] 自動模式加「手動接管」：自動模式中推搖桿就暫時改為手動
 - [ ] （選配）啟用車燈、喇叭並實測

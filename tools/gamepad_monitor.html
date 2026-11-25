@@ -205,7 +205,7 @@
       <div class="pads">
         <div><span>左 Joy-Con</span><span id="padL" class="pill idle">—</span></div>
         <div><span>右 Joy-Con</span><span id="padR" class="pill idle">—</span></div>
-        <div><span>Pro 手把（備用）</span><span id="padP" class="pill idle">—</span></div>
+        <div><span>標準手把（Xbox／PS／Pro）</span><span id="padP" class="pill idle">—</span></div>
       </div>
     </div>
     <div class="card">
@@ -320,12 +320,13 @@
         <tr><td>A（按住）</td><td>喇叭（選配）</td><td>A 亮起；有接蜂鳴器且開啟 FEATURE_BUZZER 才會響</td></tr>
         <tr><td>B（按一下）</td><td>車燈開關（選配）</td><td>B 亮起；有接燈且開啟 FEATURE_LIGHTS 才會亮</td></tr>
         <tr><td>連上後放著不動 0.5 秒</td><td>搖桿自動歸零</td><td>手把狀態從「歸零中」變「就緒」，放開搖桿時 T、S 都是 0</td></tr>
-        <tr><td>關掉任一支 Joy-Con</td><td>斷線保護：立刻停車、回到手動</td><td>1 秒內「可以開車嗎」變成「不行」、輸出歸零</td></tr>
+        <tr><td>關掉任一支 Joy-Con</td><td>組合改變：先停車、回到手動，放開搖桿後改用剩下那支（單 Joy-Con）</td><td>1 秒內輸出歸零；放開搖桿後「可以開車嗎」變回「可以」</td></tr>
+        <tr><td>Joy-Con 全部關掉</td><td>斷線保護：立刻停車、回到手動</td><td>1 秒內「可以開車嗎」變成「不行」、輸出歸零</td></tr>
         <tr><td>正前方 &lt; 15 cm 時往前推</td><td>防撞輔助：禁止前進、手把震動（可後退、可原地轉）</td><td>判讀出現「防撞：禁止前進」</td></tr>
       </tbody>
     </table>
     <p class="small muted" style="margin:10px 0 0">
-      備用 Pro 手把：左搖桿上下 = 油門、右搖桿左右 = 轉向，ZR／＋／A／B 功能相同（A/B 實際對應待測）。
+      標準手把（Xbox、PS、Switch Pro）：左搖桿上下 = 油門、右搖桿左右 = 轉向；右扳機（RT／R2／ZR）加速、選單鍵（≡／OPTIONS／＋）切換模式（實際對應待測）。
       只插 USB 沒接電池時，電池保護會把「實際輸出」歸零、手把會一直小震動，屬正常；看「指令」欄就知道車子本來要怎麼走。
     </p>
   </section>
@@ -424,7 +425,7 @@ function detectEvents(d, stamp) {
     }
     if (d.mode !== prev.mode) ev.push(`模式 → ${d.mode === "AUTO" ? "自動避障" : "手動"}`);
     if (d.pad !== prev.pad) ev.push(d.pad ? "手把就緒，可以開車" : "手把未就緒 → 停車");
-    const names = { jl: "左 Joy-Con", jr: "右 Joy-Con", pro: "Pro 手把" };
+    const names = { jl: "左 Joy-Con", jr: "右 Joy-Con", pro: "標準手把" };
     for (const k of Object.keys(names)) {
       if (d[k] !== prev[k]) ev.push(`${names[k]}：${padText(d[k])}`);
     }
@@ -464,7 +465,8 @@ function verdictOf(d) {
 function reasonsOf(d) {
   const r = [];
   if (!d.pad) {
-    if (d.pro === 0 && (d.jl === 0 || d.jr === 0)) r.push(["bad", "需要左右兩支 Joy-Con 都連上（或一支 Pro 手把）"]);
+    if (d.pro === 0 && d.jl === 0 && d.jr === 0) r.push(["bad", "沒有手把：連上一支或兩支 Joy-Con（或一支 Xbox／PS／Pro 手把）"]);
+    if (d.jl === 2 || d.jr === 2 || d.pro === 2) r.push(["warn", "手把組合剛改變：放開搖桿（回到中間）後才能開"]);
     if (d.jl === 1 || d.jr === 1 || d.pro === 1) r.push(["warn", "搖桿歸零中：放開搖桿、手把放著別動"]);
     return r;
   }
@@ -521,7 +523,7 @@ function render(d) {
   $("driveOk").className = "big " + (d.pad ? "" : "muted");
   $("driveOk").style.color = d.pad ? "var(--ok)" : "var(--bad)";
   $("driveWhy").textContent = d.pad
-    ? (d.pro === 2 ? "使用 Pro 手把" : "兩支 Joy-Con 都就緒")
+    ? (d.pro === 2 ? "使用標準手把" : d.jl === 2 && d.jr === 2 ? "兩支 Joy-Con 都就緒" : d.jl === 2 ? "只用左 Joy-Con" : "只用右 Joy-Con")
     : "斷線保護：停車中";
 
   $("mode").textContent = d.mode === "AUTO" ? "自動避障" : "手動";
