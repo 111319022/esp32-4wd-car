@@ -55,7 +55,7 @@ HC-SR04 ×3 ──測距──▶ ESP32-WROOM-32 ──控制訊號──▶ L29
 | [`firmware/car_main/sonar.cpp`](firmware/car_main/sonar.cpp) | 三顆 HC-SR04 輪流測距 |
 | [`firmware/car_main/battery.cpp`](firmware/car_main/battery.cpp) | 電池電壓監測、低電壓停車鎖定 |
 | [`firmware/car_main/extras.cpp`](firmware/car_main/extras.cpp) | 選配車燈、喇叭 |
-| [`firmware/tests/`](firmware/tests/) | 單項測試程式：馬達、手把、超音波、電池 |
+| [`firmware/tests/`](firmware/tests/) | 單項測試程式：馬達、手把、超音波、電池；`test_sonar_diag` 用來找超音波接線問題 |
 | [`tools/gamepad_monitor.html`](tools/gamepad_monitor.html) | 測試用網頁：用 Web Serial 讀 ESP32，即時顯示手把與判讀結果 |
 
 控制邏輯與設計理由分別見 [`docs/software.md`](docs/software.md) 與 [`docs/decisions.md`](docs/decisions.md)。
